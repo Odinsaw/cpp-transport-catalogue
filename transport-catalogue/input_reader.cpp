@@ -4,9 +4,9 @@
 
 using namespace std;
 namespace InputReader {
-	//удаляет лишние знаки, приводит запрос к вектору {имя, координата x, координата y, (расстояния)...}
-	vector<string> Query::AddStop(QueryVector command) {
-		vector<string> out;
+
+	pair<Catalogue::Stop, BusToDistance> DataBaseUpdater::StopUpdate(UpdateVector command) {
+		
 		auto it = find_if(command.begin(), command.end(), [](string_view s) {return s.back() == ':'; });
 		int index = distance(command.begin(), it);
 		string name;
@@ -18,177 +18,130 @@ namespace InputReader {
 		x.pop_back();
 		string y(command[index + 2]);
 
-		out.push_back(name);
-		out.push_back(x);
-		out.push_back(y);
-
 		if (index + 3 == command.size()) {
-			return out;
+			return { {name, stod(x), stod(y)}, {} }; //возвращаем остановку для добавления без информации по расстояниям
 		}
 
-		out.back().pop_back();
+		y.pop_back(); //удаляем лишнюю запятую
 
-		unsigned int cur_pos = 3;
+		Catalogue::Stop new_stop{ name, stod(x), stod(y) }; //остановка
+
+		BusToDistance distances;
+
+		unsigned int cur_pos = index + 3;
 
 		do {
 			auto next_comma = find_if(command.begin() + cur_pos, command.end(), [](string_view s) {return s.back() == ','; });
 
-			string dist = string(command[cur_pos]);
-			dist.pop_back();
-			out.push_back(dist);
-			string n;
+			string distance_info = string(command[cur_pos]); //значение расстояния
+			distance_info.pop_back(); //удаляем 'm'
+			string bus_name;
 			unsigned int d = distance(command.begin(), next_comma);
 			for (auto i = cur_pos + 2; i <= min(d, static_cast<unsigned int>(command.size() - 1)); ++i) {
-				n += string(command[i]) + " "s;
+				bus_name += string(command[i]) + " "s;
 			}
 			if (d < command.size() - 1) {
-				n = n.substr(0, n.size() - 2);
+				bus_name = bus_name.substr(0, bus_name.size() - 2);
 
 			}
 			else {
-				n.pop_back();
+				bus_name.pop_back();
 			}
-			out.push_back(n);
+			distances[bus_name] = stod(distance_info);
 			cur_pos = d + 1;
 		} while (cur_pos < command.size());
 
-		return out;
+		return { new_stop, distances };
 	}
 
-	//удаляет лишние знаки, приводит запрос к вектору {имя, остановка 1, остановка 2, ...}
-	vector<string> Query::AddBus(QueryVector command) {
-		vector<string> out;
-		out.reserve(command.size());
+	//возвращает имя маршрута + список остановок
+	pair<string, vector<string>> DataBaseUpdater::BusUpdate(UpdateVector command) {
+		vector<string> bus_list;
+		bus_list.reserve(command.size());
 
 		auto it = find_if(command.begin(), command.end(), [](string_view s) {return s.back() == ':'; });
 		int index = distance(command.begin(), it);
-		string name;
+		string bus_name;
 		for (auto i = 0; i <= index; ++i) {
-			name += string(command[i]) + " "s;
+			bus_name += string(command[i]) + " "s;
 		}
-		name = name.substr(0, name.size() - 2);
-		out.push_back(name);
+		bus_name = bus_name.substr(0, bus_name.size() - 2);
+		
 		bool rev = false;
-		string temp;
+		string stop_of_bus;
 		for (int i = index + 1; i < command.size(); ++i) {
 			if (command[i] == ">"sv) {
-				temp.pop_back();
-				out.push_back(temp);
-				temp.clear();
+				stop_of_bus.pop_back();
+				bus_list.push_back(stop_of_bus);
+				stop_of_bus.clear();
 				continue;
 			}
 			else if (command[i] == "-"sv) {
 				rev = true;
-				temp.pop_back();
-				out.push_back(temp);
-				temp.clear();
+				stop_of_bus.pop_back();
+				bus_list.push_back(stop_of_bus);
+				stop_of_bus.clear();
 				continue;
 			}
-			temp += string(command[i]) + " "s;
+			stop_of_bus += string(command[i]) + " "s;
 		}
-		temp.pop_back();
-		out.push_back(temp);
+		stop_of_bus.pop_back();
+		bus_list.push_back(stop_of_bus);
 
-		if (rev && out.size() > 2) {
-			vector<string> r(out.begin() + 1, out.end());
+		if (rev && bus_list.size() > 1) {
+			vector<string> r(bus_list.begin(), bus_list.end());
 			r.pop_back();
 			reverse(r.begin(), r.end());
-			out.insert(out.end(), r.begin(), r.end());
+			bus_list.insert(bus_list.end(), r.begin(), r.end());
 		}
-		return out;
+		return { bus_name, bus_list };
 	}
 
-	//оставляет только имя
-	string Query::GetBusInfo(QueryVector command) {
-		string name;
-		for (auto i = 0; i < command.size(); ++i) {
-			name += string(command[i]) + " "s;
-		}
-		name.pop_back();
-		return name;
-	}
-
-	//оставляет только имя
-	string Query::GetBusesForStop(QueryVector command) {
-		string name;
-		for (auto i = 0; i < command.size(); ++i) {
-			name += string(command[i]) + " "s;
-		}
-		name.pop_back();
-		return name;
-	}
-
+	
 	int detail::ReadNumber(istream& input) {
 		string s;
 		getline(input, s);
 		return stoi(s);
 	}
 
-	//заполнение очереди
-	void Query::ReadCIn(istream& input) {
-		int n = detail::ReadNumber(input);
-		for (int i = 0; i < n; ++i) {
+	//добавления остановок и маршрутов
+	void DataBaseUpdater::ReadUpdates(istream& input, Catalogue::TransportCatalogue& catalogue) {
+		int number_lines = detail::ReadNumber(input);
+		for (int i = 0; i < number_lines; ++i) {
 			string line;
 			getline(input, line);
-			query_data_.push_back(move(line));
-			vector<string_view> in = detail::SplitIntoWordsByONESPACE(query_data_.back());
-			vector<string_view> command(in.begin() + 1, in.end());
+			vector<string_view> in = detail::SplitIntoWordsByONESPACE(line);
+			vector<string> command(in.begin() + 1, in.end());
 			if (in[0] == "Stop"sv) {
-				query_[QueryType::AddStop].push_back(command);
+
+				stop_updates_.push_back(command);
+				auto [new_stop, distances] = StopUpdate(command);
+				catalogue.AddStop(new_stop, distances);
+
 			}
 			else if (in[0] == "Bus"sv) {
-				query_[QueryType::AddBus].push_back(command);
+
+				bus_updates_.push_back(command);
+
 			}
 		}
-		n = detail::ReadNumber(input);
-		for (int i = 0; i < n; ++i) {
-			string line;
-			getline(input, line);
-			query_data_.push_back(move(line));
-			vector<string_view> in = detail::SplitIntoWordsByONESPACE(query_data_.back());
-			vector<string_view> command(in.begin() + 1, in.end());
-			if (in[0] == "Stop"sv) {
-				query2_.push_back({ QueryType::GetBusesForStop , command });
-			}
-			else if (in[0] == "Bus"sv) {
-				query2_.push_back({ QueryType::GetBusInfo , command });
-			}
+		for (UpdateVector command : bus_updates_) {
+			
+			auto [new_bus_name, bus_list] = BusUpdate(command);
+
+			catalogue.AddBus(new_bus_name, bus_list);
 		}
+
+		for (UpdateVector command : stop_updates_) { //вторая проходка по остановкам
+
+			auto [new_stop, distances] = StopUpdate(command);
+			catalogue.AddStop(new_stop, distances);
+		}
+
 	}
 
-	//обработка очереди
-	void Query::Compute(Catalogue::TransportCatalogue& t) {
-		for (pair<QueryType, vector<QueryVector>> q_type : query_) {
-			for (QueryVector command : q_type.second) {
-				if (q_type.first == QueryType::AddStop) {
-					t.AddStop(AddStop(command));
-				}
-				else if (q_type.first == QueryType::AddBus) {
-					t.AddBus(AddBus(command));
-				}
-			}
-		}
-
-		if (query_.count(QueryType::AddStop)) {
-			for (QueryVector command : query_.at(QueryType::AddStop)) {
-				t.AddStop(AddStop(command));
-			}
-		}
-
-		for (pair<QueryType, QueryVector> q : query2_) {
-			if (q.first == QueryType::GetBusInfo) {
-				OutPut::print(StatReader::BusInfo(t.GetBusInfo(GetBusInfo(q.second))));
-			}
-			else if (q.first == QueryType::GetBusesForStop) {
-				OutPut::print(StatReader::GetBusesForStop(t.GetBusesForStop(GetBusesForStop(q.second))));
-			}
-		}
-	}
-
-	void Query::ClearQuery() {
-		query_.clear();
-		query2_.clear();
-		query_data_.clear();
+	void DataBaseUpdater::ClearQuery() {
+		bus_updates_.clear();
 	}
 
 	//удалить все пробелы
@@ -208,7 +161,6 @@ namespace InputReader {
 		}
 		return result;
 	}
-
 
 	//разделять только по одному пробелу
 	vector<string_view> detail::SplitIntoWordsByONESPACE(string_view str) {

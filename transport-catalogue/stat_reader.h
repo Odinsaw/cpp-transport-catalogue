@@ -3,9 +3,34 @@
 
 namespace StatReader {
 
-	std::string BusInfo(std::map<std::string, std::string> info);
+	using QueryVector = std::vector<std::string>;
 
-	std::string GetBusesForStop(std::vector<std::string> buses);
+	enum class RequestType {
+		StopRequest,
+		BusRequest
+	};
+
+	class TransportInfoReader {
+
+	public:
+
+		void ReadRequests(std::istream& input, Catalogue::TransportCatalogue& catalogue);
+
+	private:
+
+		void FillQueue(std::istream& input);
+
+		void ProcessQueue(Catalogue::TransportCatalogue& catalogue);
+
+		std::deque<std::pair<RequestType, QueryVector>> requests_; //буфер для очереди запросов
+
+	};
+
+	namespace detail {
+
+		std::string GetName(QueryVector command);
+
+	}
 }
 
 namespace OutPut {

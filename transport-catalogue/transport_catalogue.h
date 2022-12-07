@@ -11,7 +11,7 @@ namespace Catalogue{
 
 	struct Stop {
 		std::string name;
-		Geo::Coordinates c{ 0,0 };
+		Geo::Coordinates coords{ 0,0 };
 	};
 
 	struct Bus {
@@ -29,12 +29,14 @@ namespace Catalogue{
 
 	class TransportCatalogue {
 
+		using BusToDistance = std::unordered_map<std::string, double>;
+
 	public:
-		void AddStop(std::vector<std::string> stop);
+		void AddStop(Stop new_Stop, BusToDistance distances);
 		Stop& FindStop(const std::string& name);
-		void AddBus(std::vector<std::string> stops); // 0 - name
+		void AddBus(std::string new_bus_name, std::vector<std::string> stops_of_bus); // 0 - name
 		Bus* FindBus(const std::string& name);
-		std::map<std::string, std::string> GetBusInfo(std::string name);
+		std::vector<std::string> GetBusInfo(std::string name);
 		std::vector<std::string> GetBusesForStop(std::string name);
 	private:
 		std::deque<Stop> stops_ = { Stop() }; //0 - null stop

@@ -10,35 +10,38 @@
 
 namespace InputReader {
 
-	enum class QueryType
-	{
-		AddStop,
-		AddBus,
-		GetBusInfo,
-		GetBusesForStop,
-		GetStop
-	};
+	using BusToDistance = std::unordered_map<std::string, double>;
 
-	class Query {
-		using QueryVector = std::vector<std::string_view>;
+	class DataBaseUpdater {
+
+		using UpdateVector = std::vector<std::string>;
+
 	public:
-		void ReadCIn(std::istream& input); //считывает cin и заолняет очередь
-		void Compute(Catalogue::TransportCatalogue& t); //обрабатывает очередь
+
+		void ReadUpdates(std::istream& input, Catalogue::TransportCatalogue& catalogue); //считывает cin и добавляет остановки и маршруты
+
 		void ClearQuery();
-		std::vector<std::string> AddStop(QueryVector command);
-		std::vector<std::string> AddBus(QueryVector command);
-		std::string GetBusInfo(QueryVector command);
-		std::string GetBusesForStop(QueryVector command);
+
 	private:
-		std::deque<std::string> query_data_; //буфер для всей очереди запросов
-		std::map<QueryType, std::vector<QueryVector>> query_; //контейнер для упорядочения: сначала остановки, потом автобусы
-		std::vector< std::pair<QueryType, QueryVector>> query2_; //контейнер для запросов
+
+		std::pair<Catalogue::Stop, BusToDistance> StopUpdate(UpdateVector command); 
+
+		std::pair<std::string, std::vector<std::string>> BusUpdate(UpdateVector command);
+
+		std::deque<UpdateVector> stop_updates_; //буфер для очереди добавления остановок для двойной проходки
+
+		std::deque<UpdateVector> bus_updates_; //буфер для очереди добавления маршрутов
+
 	};
 
 	namespace detail {
+
 		int ReadNumber(std::istream& input);
+
 		std::vector<std::string_view> SplitIntoWords(std::string_view str);
+
 		std::vector<std::string_view> SplitIntoWordsByONESPACE(std::string_view str);
+
 	}
 
 }

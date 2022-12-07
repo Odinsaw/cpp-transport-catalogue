@@ -12,27 +12,23 @@ using namespace std;
 namespace Catalogue {
 
 	//добавить остановку
-	void TransportCatalogue::AddStop(vector<string> stop) {
-		if (&FindStop(stop[0]) == &stops_.front()) { //при повторном проходе пропускаем
-			stops_.push_back({ stop[0], stod(stop[1]), stod(stop[2]) });
+	void TransportCatalogue::AddStop(Stop new_stop, BusToDistance distances) {
+		if (&FindStop(new_stop.name) == &stops_.front()) { //при повторном проходе пропускаем
+			stops_.push_back(move(new_stop));
 			stopname_to_stop_.insert({ string_view(stops_.back().name),&stops_.back() });
 		}
 
-		if (stop.size() == 3) {
+		if (distances.size() == 0) {
 			return;
 		}
 
-		const Stop* this_stop = &FindStop(stop[0]);
+		const Stop* this_stop = &FindStop(new_stop.name);
 
-		for (auto i = 3; i < stop.size(); i = i + 2) {
-			const Stop* cur_stop = &FindStop(stop[i + 1]);
+		for (auto [stop_name, distance] : distances) {
+			const Stop* cur_stop = &FindStop(stop_name);
 			if (cur_stop != &stops_.front()) { //при повторном проходе пропускаем
 				auto p = pair{ this_stop, cur_stop };
-
-				stringstream sstream(stop[i]);
-				size_t num;
-				sstream >> num;
-				distances_.insert({ p, num });
+				distances_.insert({ p, distance });
 			}
 		}
 
@@ -47,11 +43,10 @@ namespace Catalogue {
 		}
 	}
 
-	void TransportCatalogue::AddBus(vector<string> stops) {
-		Bus new_bus{ move(stops[0]),{} };
-		stops.erase(stops.begin());
-		new_bus.stops.reserve(stops.size());
-		for (string& stop : stops) {
+	void TransportCatalogue::AddBus(string new_bus_name, vector<string> stops_of_bus) {
+		Bus new_bus{ move(new_bus_name),{} };
+		new_bus.stops.reserve(stops_of_bus.size());
+		for (string& stop : stops_of_bus) {
 			new_bus.stops.push_back(&FindStop(stop));
 		}
 		buses_.push_back(new_bus);
@@ -67,26 +62,27 @@ namespace Catalogue {
 		}
 	}
 
-	//возвращает информацию в виде словаря. Вместо словаря можно более подходящий контейнер
-	map<string, string> TransportCatalogue::GetBusInfo(string name) {
-		map<string, string> info;
+	std::vector<std::string> TransportCatalogue::GetBusInfo(string name) {
+
+		vector<string> out;
+
+		out.push_back(name);
 
 		Bus* c = FindBus(name);
 
 		if (c == nullptr) {
-			info.insert({ "name"s, name });
-			return info;
+			out.push_back("not found"s);
+				return out;
 		}
 
 		Bus& b = *c;
 
-		info["name"s] = name;
-		info["stops_num"s] = to_string(b.stops.size());
+		out.push_back(to_string(b.stops.size()));
 		set<Stop*> s(b.stops.begin(), b.stops.end());
-		info["unique_num"s] = to_string(s.size());
+		out.push_back(to_string(s.size()));
 
 		double geo_l = transform_reduce(b.stops.begin() + 1, b.stops.end(), b.stops.begin(), 0.0, plus<>(), [&](Stop* s1, Stop* s2) {
-			return Geo::ComputeDistance(s1->c, s2->c); });
+			return Geo::ComputeDistance(s1->coords, s2->coords); });
 
 		double l = transform_reduce(b.stops.begin() + 1, b.stops.end(), b.stops.begin(), 0.0, plus<>(),
 
@@ -105,21 +101,19 @@ namespace Catalogue {
 		);
 
 		ostringstream out_s;
-		out_s << setprecision(6) << l;
-		string len = out_s.str();
-		info["length"s] = len;
+		out_s << l;
+		out.push_back(out_s.str());
 
 		out_s.str(std::string());
-		out_s << setprecision(6) << (l / geo_l);
-		string curv = out_s.str();
-		info["curvature"s] = curv;
+		out_s << (l / geo_l);
+		out.push_back(out_s.str());
 
-		return info;
+		return out;
 	}
 
 	//возвращает вектор {имя автобуса, остановка1, остановка2...}
 	vector<string> TransportCatalogue::GetBusesForStop(string name) {
-		vector<string> out{ name };
+		vector<string> out;
 		if (!stopname_to_stop_.count(name)) {
 			out.push_back(""s);
 			return out;
