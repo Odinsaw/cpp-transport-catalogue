@@ -13,7 +13,7 @@ int main() {
 
 	Catalogue::TransportCatalogue catalogue;
 
-	update_query.ReadUpdates(cin, catalogue);
+	update_query.ReadCommands(cin, catalogue);
 
 	request_query.ReadRequests(cin,catalogue);
 

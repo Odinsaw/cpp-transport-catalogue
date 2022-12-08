@@ -19,6 +19,19 @@ namespace Catalogue{
 		std::vector<Stop*> stops;
 	};
 
+	struct BusInfo {
+		std::string name ="";
+		bool is_not_found = false;
+		std::size_t stops_number=0;
+		std::size_t unique_stops_number=0;
+		double length=0.0;
+		double curvature = 0.0;
+	};
+
+	struct StopInfo {
+		std::vector<std::string> bus_list;
+		bool is_not_found = false;
+	};
 
 	class PointerPairHasher {
 	public:
@@ -32,12 +45,20 @@ namespace Catalogue{
 		using BusToDistance = std::unordered_map<std::string, double>;
 
 	public:
-		void AddStop(Stop new_Stop, BusToDistance distances);
+		void AddStop(std::string stop_name, Geo::Coordinates coords);//принимаем параметры: имя остановки и координаты
+
+		void AddDistances(std::string stop_name, BusToDistance distances);//принимаем параметры имя остановки и контейнер с расстояниями
+		
 		Stop& FindStop(const std::string& name);
-		void AddBus(std::string new_bus_name, std::vector<std::string> stops_of_bus); // 0 - name
+
+		void AddBus(std::string bus_name, std::vector<std::string> stops_of_bus);//принимаем параметры имя маршрута и вектор с остановками
+
 		Bus* FindBus(const std::string& name);
-		std::vector<std::string> GetBusInfo(std::string name);
-		std::vector<std::string> GetBusesForStop(std::string name);
+
+		BusInfo GetBusInfo(std::string name); //возвращаем структуру с информацией по маршруту
+
+		StopInfo GetBusesForStop(std::string name);//возвращаем структуру с информацией по остановке
+
 	private:
 		std::deque<Stop> stops_ = { Stop() }; //0 - null stop
 		std::deque<Bus> buses_ = { Bus() }; //0 - null bus

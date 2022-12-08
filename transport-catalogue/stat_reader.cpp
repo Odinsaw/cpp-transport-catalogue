@@ -7,73 +7,56 @@ namespace StatReader {
 
 	void TransportInfoReader::ReadRequests(istream& input, Catalogue::TransportCatalogue& catalogue) {
 
-		FillQueue(input);
+		size_t number_lines = InputReader::detail::ReadNumber(input);
 
-		ProcessQueue(catalogue);
+		for (size_t i = 0; i < number_lines; ++i) {
 
-	}
-
-	void TransportInfoReader::FillQueue(std::istream& input) {
-
-		int number_lines = InputReader::detail::ReadNumber(input);
-
-		for (int i = 0; i < number_lines; ++i) {
-
-			string line;
+			string line = "";
 			getline(input, line);
 
 			vector<string_view> in = InputReader::detail::SplitIntoWordsByONESPACE(line);
 			vector<string> command(in.begin() + 1, in.end());
 
 			if (in[0] == "Stop"sv) {
-				requests_.push_back({ RequestType::StopRequest, move(command) });
+				Catalogue::StopInfo info = move(catalogue.GetBusesForStop(detail::GetName(command)));
+
+				cout << "Stop "s + detail::GetName(command) + ":"s;
+				if (info.is_not_found == false && info.bus_list.size() == 0) {
+					cout << " no buses"s << endl;
+				}
+				else if (info.is_not_found == true) {
+					cout << " not found"s << endl;
+				}
+				else {
+					cout << " buses"s;
+
+					for (string& bus : info.bus_list) {
+						cout << " "s + bus;
+					}
+					cout << endl;
+				}
 			}
 			else if (in[0] == "Bus"sv) {
-				requests_.push_back({ RequestType::BusRequest, move(command) });
+				Catalogue::BusInfo info = catalogue.GetBusInfo(detail::GetName(command));
+
+				cout << "Bus " << info.name << ": "s;
+				if (info.is_not_found) {
+					cout << "not found"s << endl;
+					continue;
+				}
+				cout << info.stops_number << " stops on route, "s
+					<< info.unique_stops_number << " unique stops, "s 
+					<< info.length << " route length, "s 
+					<< setprecision(6) << info.curvature << " curvature"s << endl;
+
 			}
 		}
+
 	}
-
-		void TransportInfoReader::ProcessQueue(Catalogue::TransportCatalogue & catalogue) {
-
-			for (auto request : requests_) {
-
-				if (request.first == RequestType::StopRequest) {
-
-					vector<string> bus_list = catalogue.GetBusesForStop(detail::GetName(request.second));
-
-					cout << "Stop "s + detail::GetName(request.second) + ":"s;
-					if (bus_list.size() == 0) {
-						cout << " no buses"s << endl;
-					}
-					else if (bus_list.size() == 1 && bus_list[0] == ""s) {
-						cout << " not found"s << endl;
-					}
-					else {
-						cout << " buses"s;
-
-						for (string& bus : bus_list) {
-							cout << " "s + bus;
-						}
-						cout << endl;
-					}
-				}
-				else if (request.first == RequestType::BusRequest) {
-					vector<string> info = catalogue.GetBusInfo(detail::GetName(request.second));
-
-					cout << "Bus " << info[0] << ": "s;
-					if (info.size() == 2 && info[1] == "not found"s) {
-						cout << "not found"s << endl;
-						continue;
-					}
-					cout << info[1] << " stops on route, "s << info[2] << " unique stops, "s << info[3] << " route length, "s << setprecision(6) << info[4] << " curvature"s << endl;
-				}
-			}
-		}
 
 	//оставляет только имя
 	string detail::GetName(QueryVector command) {
-		string name;
+		string name = "";
 		for (auto i = 0; i < command.size(); ++i) {
 			name += string(command[i]) + " "s;
 		}

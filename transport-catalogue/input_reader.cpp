@@ -1,46 +1,52 @@
 #include "input_reader.h"
 #include <utility>
 #include <algorithm>
+#include <cassert>
+
 
 using namespace std;
 namespace InputReader {
 
 	pair<Catalogue::Stop, BusToDistance> DataBaseUpdater::StopUpdate(UpdateVector command) {
 		
+		assert(command.size() > 1);
+
 		auto it = find_if(command.begin(), command.end(), [](string_view s) {return s.back() == ':'; });
-		int index = distance(command.begin(), it);
-		string name;
-		for (auto i = 0; i <= index; ++i) {
+		size_t index = distance(command.begin(), it);
+		string name = ""s;
+		for (size_t i = 0; i <= index; ++i) {
 			name += string(command[i]) + " "s;
 		}
+		assert(name.size() > 2);
 		name = name.substr(0, name.size() - 2);
-		string x(command[index + 1]);
-		x.pop_back();
-		string y(command[index + 2]);
+		string x_coordinate(command[index + 1]);
+		x_coordinate.pop_back();
+		string y_coordinate(command[index + 2]);
 
 		if (index + 3 == command.size()) {
-			return { {name, stod(x), stod(y)}, {} }; //возвращаем остановку для добавления без информации по расстояниям
+			return { {name, stod(x_coordinate), stod(y_coordinate)}, {} }; //возвращаем остановку для добавления без информации по расстояниям
 		}
 
-		y.pop_back(); //удаляем лишнюю запятую
+		y_coordinate.pop_back(); //удаляем лишнюю запятую
 
-		Catalogue::Stop new_stop{ name, stod(x), stod(y) }; //остановка
+		Catalogue::Stop new_stop{ name, stod(x_coordinate), stod(y_coordinate) }; //остановка
 
 		BusToDistance distances;
 
-		unsigned int cur_pos = index + 3;
+		size_t cur_pos = index + 3;
 
 		do {
 			auto next_comma = find_if(command.begin() + cur_pos, command.end(), [](string_view s) {return s.back() == ','; });
 
 			string distance_info = string(command[cur_pos]); //значение расстояния
 			distance_info.pop_back(); //удаляем 'm'
-			string bus_name;
-			unsigned int d = distance(command.begin(), next_comma);
-			for (auto i = cur_pos + 2; i <= min(d, static_cast<unsigned int>(command.size() - 1)); ++i) {
+			string bus_name = ""s;
+			size_t position = distance(command.begin(), next_comma);
+			for (auto i = cur_pos + 2; i <= min(position, static_cast<size_t>(command.size() - 1)); ++i) {
 				bus_name += string(command[i]) + " "s;
 			}
-			if (d < command.size() - 1) {
+			if (position < command.size() - 1) {
+				assert(bus_name.size() > 2);
 				bus_name = bus_name.substr(0, bus_name.size() - 2);
 
 			}
@@ -48,7 +54,7 @@ namespace InputReader {
 				bus_name.pop_back();
 			}
 			distances[bus_name] = stod(distance_info);
-			cur_pos = d + 1;
+			cur_pos = position + 1;
 		} while (cur_pos < command.size());
 
 		return { new_stop, distances };
@@ -59,17 +65,18 @@ namespace InputReader {
 		vector<string> bus_list;
 		bus_list.reserve(command.size());
 
-		auto it = find_if(command.begin(), command.end(), [](string_view s) {return s.back() == ':'; });
-		int index = distance(command.begin(), it);
+		auto it = find_if(command.begin(), command.end(), [](string_view strv) {return strv.back() == ':'; });
+		size_t index = distance(command.begin(), it);
 		string bus_name;
-		for (auto i = 0; i <= index; ++i) {
+		for (size_t i = 0; i <= index; ++i) {
 			bus_name += string(command[i]) + " "s;
 		}
+		assert(bus_name.size() > 2);
 		bus_name = bus_name.substr(0, bus_name.size() - 2);
 		
 		bool rev = false;
-		string stop_of_bus;
-		for (int i = index + 1; i < command.size(); ++i) {
+		string stop_of_bus = "";
+		for (size_t i = index + 1; i < command.size(); ++i) {
 			if (command[i] == ">"sv) {
 				stop_of_bus.pop_back();
 				bus_list.push_back(stop_of_bus);
@@ -99,24 +106,25 @@ namespace InputReader {
 
 	
 	int detail::ReadNumber(istream& input) {
-		string s;
-		getline(input, s);
-		return stoi(s);
+		string sstr = "";
+		getline(input, sstr);
+		return stoi(sstr);
 	}
 
 	//добавления остановок и маршрутов
-	void DataBaseUpdater::ReadUpdates(istream& input, Catalogue::TransportCatalogue& catalogue) {
+	void DataBaseUpdater::ReadCommands(istream& input, Catalogue::TransportCatalogue& catalogue) {
 		int number_lines = detail::ReadNumber(input);
 		for (int i = 0; i < number_lines; ++i) {
-			string line;
+			string line = "";
 			getline(input, line);
 			vector<string_view> in = detail::SplitIntoWordsByONESPACE(line);
 			vector<string> command(in.begin() + 1, in.end());
 			if (in[0] == "Stop"sv) {
 
 				stop_updates_.push_back(command);
-				auto [new_stop, distances] = StopUpdate(command);
-				catalogue.AddStop(new_stop, distances);
+				auto [stop, distances] = StopUpdate(command);
+				catalogue.AddStop(stop.name, stop.coords);
+				catalogue.AddDistances(stop.name, distances);
 
 			}
 			else if (in[0] == "Bus"sv) {
@@ -134,8 +142,9 @@ namespace InputReader {
 
 		for (UpdateVector command : stop_updates_) { //вторая проходка по остановкам
 
-			auto [new_stop, distances] = StopUpdate(command);
-			catalogue.AddStop(new_stop, distances);
+			auto [stop, distances] = StopUpdate(command);
+			catalogue.AddStop(stop.name, stop.coords);
+			catalogue.AddDistances(stop.name, distances);
 		}
 
 	}

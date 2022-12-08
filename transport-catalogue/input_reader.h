@@ -18,7 +18,7 @@ namespace InputReader {
 
 	public:
 
-		void ReadUpdates(std::istream& input, Catalogue::TransportCatalogue& catalogue); //считывает cin и добавляет остановки и маршруты
+		void ReadCommands(std::istream& input, Catalogue::TransportCatalogue& catalogue); //считывает cin и добавляет остановки и маршруты
 
 		void ClearQuery();
 

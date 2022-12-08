@@ -16,14 +16,6 @@ namespace StatReader {
 
 		void ReadRequests(std::istream& input, Catalogue::TransportCatalogue& catalogue);
 
-	private:
-
-		void FillQueue(std::istream& input);
-
-		void ProcessQueue(Catalogue::TransportCatalogue& catalogue);
-
-		std::deque<std::pair<RequestType, QueryVector>> requests_; //буфер для очереди запросов
-
 	};
 
 	namespace detail {
