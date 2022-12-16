@@ -1,21 +1,17 @@
-#include "input_reader.h"
-#include "stat_reader.h"
-#include <iostream>
-#include <iomanip>
-
-using namespace std;
+#include "request_handler.h"
+#include "json_reader.h"
+#include "map_renderer.h"
+#include <memory>
+#include <fstream>
+#include "domain.h"
 
 int main() {
 
-	InputReader::DataBaseUpdater update_query;
+Catalogue::TransportCatalogue new_catalogue; //создаем каталог
+std::unique_ptr<DataBaseInterface::RequestsHandler> new_handler = std::make_unique<DataBaseInterface::RequestsHandler>(new_catalogue); //создаем обработчик запросов и привязываем к каталогу
+DataReader::JsonReader new_json_reader(std::cin, std::move(new_handler)); //создаем обработчик json и даем ссылку на обработчик запросов
+new_json_reader.ReadBaseRequests();
+new_json_reader.ReadStatRequests(std::cout);
 
-	StatReader::TransportInfoReader request_query;
-
-	Catalogue::TransportCatalogue catalogue;
-
-	update_query.ReadCommands(cin, catalogue);
-
-	request_query.ReadRequests(cin,catalogue);
-
-	return 0;
+return 0;
 }

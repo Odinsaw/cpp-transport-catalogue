@@ -5,33 +5,11 @@
 #include <string_view>
 #include <map>
 #include <vector>
-#include "geo.h"
+#include "domain.h"
 
 namespace Catalogue{
 
-	struct Stop {
-		std::string name;
-		Geo::Coordinates coords{ 0,0 };
-	};
-
-	struct Bus {
-		std::string name;
-		std::vector<Stop*> stops;
-	};
-
-	struct BusInfo {
-		std::string name ="";
-		bool is_not_found = false;
-		std::size_t stops_number=0;
-		std::size_t unique_stops_number=0;
-		double length=0.0;
-		double curvature = 0.0;
-	};
-
-	struct StopInfo {
-		std::vector<std::string> bus_list;
-		bool is_not_found = false;
-	};
+	using BusToDistance = std::unordered_map<std::string, double>;
 
 	class PointerPairHasher {
 	public:
@@ -42,22 +20,23 @@ namespace Catalogue{
 
 	class TransportCatalogue {
 
-		using BusToDistance = std::unordered_map<std::string, double>;
-
 	public:
+
 		void AddStop(std::string stop_name, Geo::Coordinates coords);//принимаем параметры: имя остановки и координаты
 
 		void AddDistances(std::string stop_name, BusToDistance distances);//принимаем параметры имя остановки и контейнер с расстояниями
 		
 		Stop& FindStop(const std::string& name);
 
-		void AddBus(std::string bus_name, std::vector<std::string> stops_of_bus);//принимаем параметры имя маршрута и вектор с остановками
+		void AddBus(std::string bus_name, std::vector<std::string> stops_of_bus, std::string end_stop);//принимаем параметры имя маршрута и вектор с остановками и конечную остановку
 
 		Bus* FindBus(const std::string& name);
 
 		BusInfo GetBusInfo(std::string name); //возвращаем структуру с информацией по маршруту
 
 		StopInfo GetBusesForStop(std::string name);//возвращаем структуру с информацией по остановке
+
+		std::vector<Bus*> GetAllBuses();
 
 	private:
 		std::deque<Stop> stops_ = { Stop() }; //0 - null stop

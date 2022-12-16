@@ -6,7 +6,6 @@
 #include <sstream>
 #include <iomanip>
 
-
 using namespace std;
 
 namespace Catalogue {
@@ -19,7 +18,7 @@ namespace Catalogue {
 		}
 	}
 
-	void TransportCatalogue::AddDistances(string stop_name, BusToDistance distances) {
+	void TransportCatalogue::AddDistances(string stop_name, Catalogue::BusToDistance distances) {
 		if (distances.size() == 0) {
 			return;
 		}
@@ -45,15 +44,19 @@ namespace Catalogue {
 		}
 	}
 
-	void TransportCatalogue::AddBus(string new_bus_name, vector<string> stops_of_bus) {
-		Bus new_bus{ move(new_bus_name),{} };
+	void TransportCatalogue::AddBus(string new_bus_name, vector<string> stops_of_bus, string end_stop) {
+		//Bus new_bus{ move(new_bus_name),{} };
+		Bus new_bus;
+		new_bus.name = new_bus_name;
 		new_bus.stops.reserve(stops_of_bus.size());
 		for (string& stop : stops_of_bus) {
 			new_bus.stops.push_back(&FindStop(stop));
 		}
+		new_bus.end_stop = &FindStop(end_stop);
 		buses_.push_back(new_bus);
 		busname_to_bus_.insert({ string_view(buses_.back().name),&buses_.back() });
 	}
+
 	Bus* TransportCatalogue::FindBus(const string& name) {
 		auto bus = busname_to_bus_.find(string_view(name));
 		if (bus == busname_to_bus_.end()) {
@@ -112,7 +115,7 @@ namespace Catalogue {
 	StopInfo TransportCatalogue::GetBusesForStop(string name) {
 		vector<string> out;
 		if (!stopname_to_stop_.count(name)) {
-			return { {}, true };
+			return {move(name), {}, true };
 		}
 		Stop* s = stopname_to_stop_.at(name);
 		vector<string> temp;
@@ -124,9 +127,21 @@ namespace Catalogue {
 		sort(temp.begin(), temp.end());
 		out.insert(out.end(), temp.begin(), temp.end());
 
+		return { move(name), move(out)};
+	}
 
-
-		return {move(out)};
+	std::vector<Bus*> TransportCatalogue::GetAllBuses() {
+		std::vector<Bus*> out;
+		out.reserve(buses_.size());
+		bool is_first = true;
+		for (Bus& bus : buses_) {
+			if (is_first) {
+				is_first = false; //пропускаем null_bus
+				continue;
+			}
+			out.push_back(&bus);
+		}
+		return out;
 	}
 }
 
