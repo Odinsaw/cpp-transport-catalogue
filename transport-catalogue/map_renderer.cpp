@@ -134,14 +134,6 @@ namespace Visual {
                 continue;
             }
 
-            //std::unordered_set<Catalogue::Stop*> end_stops;
-            //end_stops.insert(bus->stops.back());
-            //end_stops.insert(*(bus->stops.begin()));
-
-            //if (CheckSymmetricTrip(bus->stops) && end_stops.size() < 2) {
-            //    end_stops.insert(*(bus->stops.begin() + bus->stops.size()/2));
-            //}
-
             std::unordered_set<Catalogue::Stop*> end_stops{ bus->end_stop, *(bus->stops.begin())};
 
             auto& bus_color = GetBusLineColor(bus_index++);
@@ -211,16 +203,3 @@ namespace Visual {
     }
 
 }
-
-//bool CheckSymmetricTrip(const std::vector<Catalogue::Stop*>& stops) {
-//
-//    if (!stops.empty()) {
-//        if (std::equal(stops.begin(), stops.begin() + stops.size() / 2, stops.rbegin()) || stops.size()%2 == 0) {
-//            return true;
-//        }
-//        else {
-//            return false;
-//        }
-//    }
-//    return false;
-//}

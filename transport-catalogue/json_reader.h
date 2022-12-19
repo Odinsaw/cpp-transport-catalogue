@@ -19,6 +19,9 @@ namespace DataReader {
 		void ReadStatRequests(std::ostream& output) override;
 		Visual::MapSettings ReadMapSettings() override;
 
+		void ReadBusesBaseRequests();
+		void ReadStopsBaseRequests();
+
 	private:
 
 		std::tuple<std::string, std::vector<std::string>, std::string> ReadBusBaseRequest(const json::Dict base_request); //для добавления маршрута нужно имя и вектор остановок
@@ -35,7 +38,7 @@ namespace DataReader {
 		std::unique_ptr<DataBaseInterface::RequestsHandler> handler_;
 	};
 
-	svg::Color get_color_from_node(json::Node node);
+	svg::Color GetColorFromNode(json::Node node);
 
 }
 

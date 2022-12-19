@@ -11,7 +11,7 @@ namespace DataReader {
 		assert(correct_root); //в корневом узле должен быть словарь {base_requests : ... , stat_requests : ...}
 	}
 
-	void JsonReader::ReadBaseRequests() {
+	void JsonReader::ReadBusesBaseRequests() {
 
 		json::Dict root_dict = std::get<json::Dict>(input_document_.GetRoot().GetValue());
 
@@ -31,35 +31,57 @@ namespace DataReader {
 				assert(std::holds_alternative<std::string>(base_request.at("type").GetValue())); //тип в виде строки
 				std::string base_request_type = std::get<std::string>(base_request.at("type").GetValue());
 
-				if (base_request_type == "Stop") {
-
-					auto request_parsed = ReadStopBaseRequest(base_request);
-					handler_->DoStopBaseRequest(std::move(request_parsed.first), std::move(request_parsed.second));
-				} //первая проходка только по остановкам
-			}
-
-			for (const json::Node& node : base_requests_queue) {
-
-				bool correct_base_request = std::holds_alternative<json::Dict>(node.GetValue());
-				assert(correct_base_request); //запрос должен быть в виде словаря
-				json::Dict base_request = std::get<json::Dict>(node.GetValue());
-
-				assert(base_request.count("type")); //запрос должен содержать тип
-				assert(std::holds_alternative<std::string>(base_request.at("type").GetValue())); //тип в виде строки
-				std::string base_request_type = std::get<std::string>(base_request.at("type").GetValue());
-
 				if (base_request_type == "Bus") {
 					auto request_parsed = ReadBusBaseRequest(base_request);
 					handler_->DoBusBaseRequest(std::move(std::get<0>(request_parsed)), std::move(std::get<1>(request_parsed)), std::move(std::get<2>(request_parsed)));
 				}
-				else if (base_request_type == "Stop") {
-					auto request_parsed = ReadStopBaseRequest(base_request);
-					handler_->DoStopBaseRequest(std::move(request_parsed.first), std::move(request_parsed.second));
-				}
-			} //вторая проходка по остановкам и маршрутам
-
+			}
 		}
+	}
 
+	void JsonReader::ReadStopsBaseRequests() {
+
+		json::Dict root_dict = std::get<json::Dict>(input_document_.GetRoot().GetValue());
+
+if (root_dict.count("base_requests")) {
+
+	bool correct_base_requests_queue = std::holds_alternative<json::Array>(root_dict.at("base_requests").GetValue());
+	assert(correct_base_requests_queue); //в узле base_requests должен быть вектор запросов
+	json::Array base_requests_queue = std::get<json::Array>(root_dict.at("base_requests").GetValue());
+
+	for (const json::Node& node : base_requests_queue) {
+
+		bool correct_base_request = std::holds_alternative<json::Dict>(node.GetValue());
+		assert(correct_base_request); //запрос должен быть в виде словаря
+		json::Dict base_request = std::get<json::Dict>(node.GetValue());
+
+		assert(base_request.count("type")); //запрос должен содержать тип
+		assert(std::holds_alternative<std::string>(base_request.at("type").GetValue())); //тип в виде строки
+		std::string base_request_type = std::get<std::string>(base_request.at("type").GetValue());
+
+		if (base_request_type == "Stop") {
+			auto request_parsed = ReadStopBaseRequest(base_request);
+			handler_->DoStopBaseRequest(std::move(request_parsed.first), std::move(request_parsed.second));
+		} //первая проходка
+	}
+
+	for (const json::Node& node : base_requests_queue) {
+
+		json::Dict base_request = std::get<json::Dict>(node.GetValue());
+		std::string base_request_type = std::get<std::string>(base_request.at("type").GetValue());
+
+		if (base_request_type == "Stop") {
+			auto request_parsed = ReadStopBaseRequest(base_request);
+			handler_->DoStopBaseRequest(std::move(request_parsed.first), std::move(request_parsed.second));
+		}
+	} //вторая проходка
+
+}
+	}
+
+	void JsonReader::ReadBaseRequests() {
+		ReadStopsBaseRequests();
+		ReadBusesBaseRequests();
 	}
 
 	std::tuple<std::string, std::vector<std::string>, std::string> JsonReader::ReadBusBaseRequest(const json::Dict base_request) {
@@ -268,7 +290,7 @@ namespace DataReader {
 			assert(bus_offset.size() == 2);
 			double x1 = bus_offset[0].AsDouble();
 			double y1 = bus_offset[1].AsDouble();
-			settings.bus_label_offset = { x1,y1 };
+			settings.bus_label_offset = { x1, y1 };
 
 			settings.stop_label_font_size = settings_from_json.at("stop_label_font_size").AsInt();
 
@@ -276,9 +298,9 @@ namespace DataReader {
 			assert(stop_offset.size() == 2);
 			double x2 = stop_offset[0].AsDouble();
 			double y2 = stop_offset[1].AsDouble();
-			settings.stop_label_offset = { x2,y2 };
+			settings.stop_label_offset = { x2, y2 };
 
-			settings.underlayer_color = get_color_from_node(settings_from_json.at("underlayer_color"));
+			settings.underlayer_color = GetColorFromNode(settings_from_json.at("underlayer_color"));
 
 			settings.underlayer_width = settings_from_json.at("underlayer_width").AsDouble();
 
@@ -286,41 +308,41 @@ namespace DataReader {
 			if (!settings_from_json.at("color_palette").AsArray().empty()) {
 				settings.color_palette.clear();
 				for (const json::Node& cur_node : settings_from_json.at("color_palette").AsArray()) {
-					settings.color_palette.push_back(std::move(get_color_from_node(cur_node)));
+					settings.color_palette.push_back(std::move(GetColorFromNode(cur_node)));
 				}
 			}
 		}
 		return settings;
 	}
 
-	svg::Color get_color_from_node(json::Node node) {
+	svg::Color GetColorFromNode(json::Node node) {
 
 		assert(node.IsString() || node.IsArray());
 		if (node.IsString()) {
 			return node.AsString();
 		}
 		else if (node.IsArray()) {
-			json::Array temp = node.AsArray();
-			assert(temp.size() == 3 || temp.size() == 4);
-			if (temp.size() == 3) {
+			json::Array color_node = node.AsArray();
+			assert(color_node.size() == 3 || color_node.size() == 4);
+			if (color_node.size() == 3) {
 				svg::Rgb rgb;
 				/*rgb.red = temp[0].AsInt();
 				rgb.green = temp[1].AsInt();
 				rgb.blue = temp[2].AsInt();*/
-				rgb.red = temp[0].AsDouble();
-				rgb.green = temp[1].AsDouble();
-				rgb.blue = temp[2].AsDouble();
+				rgb.red = color_node[0].AsDouble();
+				rgb.green = color_node[1].AsDouble();
+				rgb.blue = color_node[2].AsDouble();
 				return rgb;
 			}
-			else if (temp.size() == 4) {
+			else if (color_node.size() == 4) {
 				svg::Rgba rgba;
 				/*rgba.red = temp[0].AsInt();
 				rgba.green = temp[1].AsInt();
 				rgba.blue = temp[2].AsInt();*/
-				rgba.red = temp[0].AsDouble();
-				rgba.green = temp[1].AsDouble();
-				rgba.blue = temp[2].AsDouble();
-				rgba.opacity = temp[3].AsDouble();
+				rgba.red = color_node[0].AsDouble();
+				rgba.green = color_node[1].AsDouble();
+				rgba.blue = color_node[2].AsDouble();
+				rgba.opacity = color_node[3].AsDouble();
 				return rgba;
 			}
 		}

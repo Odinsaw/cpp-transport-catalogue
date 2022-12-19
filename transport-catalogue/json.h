@@ -27,21 +27,11 @@ namespace json {
     // Функцию следует использовать после считывания открывающего символа ":
     std::string GetString(std::istream& input);
 
-    class Node {
+    class Node final
+        : private std::variant<std::nullptr_t, Array, Dict, bool, int, double, std::string> {
     public:
         using Value = std::variant<std::nullptr_t, Array, Dict, bool, int, double, std::string>;
-
-        Node() = default;
-
-         Node(Array array);
-         Node(Dict map);
-         Node(int value);
-         Node(std::string value);
-         Node(bool value);
-         Node(double value);
-        Node(nullptr_t) {
-
-        }
+        using variant::variant;
 
         bool IsInt() const;
         bool IsDouble() const; //Возвращает true, если в Node хранится int либо double.
@@ -65,15 +55,13 @@ namespace json {
             if (&rhs == this) {
                 return true;
             }
-            return rhs.GetValue() == value_;
+            //return rhs.GetValue() == value_;
+            return rhs.GetValue() == *this;
         }
 
         bool operator!=(const Node& rhs) const{
             return !(rhs == *this);
         }
-
-    private:
-        Value value_;
     };
 
     class Document {
