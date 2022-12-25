@@ -192,18 +192,12 @@ if (root_dict.count("base_requests")) {
 				}
 			}
 
-			output << "[\n";
-			bool is_first = true;
+			json::Array out_requests;
 			for (const auto& doc : answered_requests) {
-				if (is_first) {
-					json::Print(doc, output);
-					is_first = false;
-					continue;
-				}
-				output << ",\n";
-				json::Print(doc, output);
+				out_requests.emplace_back(doc.GetRoot());
 			}
-			output << "\n]";
+			json::Document result_node{ json::Builder{}.Value(out_requests).Build() };
+			json::Print(result_node, output);
 		}
 	}
 
@@ -219,47 +213,33 @@ if (root_dict.count("base_requests")) {
 
 	json::Document JsonReader::MakeBusInfoJSON(int id, Catalogue::BusInfo& bus_info) {
 
-		std::stringstream strm;
-
 		if (bus_info.is_not_found) {
-			strm << "{ \"request_id\": " << id << ", \"error_message\": \"not found\"}";
-			return json::Load(strm);
+			json::Document result_node{ json::Builder{}.StartDict().Key("request_id").Value(id).Key("error_message").Value("not found").EndDict().Build() };
+			return result_node;
 		}
 
-		strm << "{";
-		strm << "\"curvature\":" << bus_info.curvature << ", ";
-		strm << "\"request_id\":" << id << ", ";
-		strm << "\"route_length\":" << bus_info.length << ", ";
-		strm << "\"stop_count\":" << bus_info.stops_number << ", ";
-		strm << "\"unique_stop_count\":" << bus_info.unique_stops_number;
-		strm << "}";
-		return json::Load(strm);
+		json::Document result_node{ json::Builder{}.StartDict().Key("curvature").Value(bus_info.curvature).Key("request_id").Value(id)
+		.Key("route_length").Value(bus_info.length).Key("stop_count").Value(static_cast<int>(bus_info.stops_number)).Key("unique_stop_count").Value(static_cast<int>(bus_info.unique_stops_number)).EndDict()
+		.Build()};
+
+		return result_node;
 	}
 
 	json::Document JsonReader::MakeStopInfoJSON(int id, Catalogue::StopInfo& stop_info) {
 
-		std::stringstream strm;
-
 		if (stop_info.is_not_found) {
-			strm << "{ \"request_id\": " << id << ", \"error_message\": \"not found\"}";
-			return json::Load(strm);
+			json::Document result_node{ json::Builder{}.StartDict().Key("request_id").Value(id).Key("error_message").Value("not found").EndDict().Build()};
+			return result_node;
 		}
 
-		strm << "{\"buses\": [";
-
-		bool is_first = true;
+		json::Array buses;
 		for (const std::string& bus : stop_info.bus_list) {
-			if (is_first) {
-				strm << "\"" << bus << "\"";
-				is_first = false;
-				continue;
+			buses.emplace_back(bus);
 			}
-			strm << ", \"" << bus << "\"";
-			is_first = false;
-		}
 
-		strm << "], \"request_id\": " << id << "}";
-		return json::Load(strm);
+		json::Document result_node{ json::Builder{}.StartDict().Key("buses").Value(buses).Key("request_id").Value(id).EndDict().Build() };
+
+		return result_node;
 	}
 
 	Visual::MapSettings JsonReader::ReadMapSettings() {
@@ -326,9 +306,6 @@ if (root_dict.count("base_requests")) {
 			assert(color_node.size() == 3 || color_node.size() == 4);
 			if (color_node.size() == 3) {
 				svg::Rgb rgb;
-				/*rgb.red = temp[0].AsInt();
-				rgb.green = temp[1].AsInt();
-				rgb.blue = temp[2].AsInt();*/
 				rgb.red = color_node[0].AsDouble();
 				rgb.green = color_node[1].AsDouble();
 				rgb.blue = color_node[2].AsDouble();
@@ -336,9 +313,6 @@ if (root_dict.count("base_requests")) {
 			}
 			else if (color_node.size() == 4) {
 				svg::Rgba rgba;
-				/*rgba.red = temp[0].AsInt();
-				rgba.green = temp[1].AsInt();
-				rgba.blue = temp[2].AsInt();*/
 				rgba.red = color_node[0].AsDouble();
 				rgba.green = color_node[1].AsDouble();
 				rgba.blue = color_node[2].AsDouble();
@@ -362,12 +336,8 @@ if (root_dict.count("base_requests")) {
 		std::string map_string = strm.str();
 		strm.str(std::string());
 
-		json::Node map_node(map_string);
-		json::Node id_node(id);
-		json::Node result_node(json::Dict{ { "map", map_node }, {"request_id", id_node} });
+		json::Document result_node{ json::Builder{}.StartDict().Key("map").Value(map_string).Key("request_id").Value(id).EndDict().Build() };
 
-		return json::Document(result_node);
-
+		return result_node;
 	}
-
 }
