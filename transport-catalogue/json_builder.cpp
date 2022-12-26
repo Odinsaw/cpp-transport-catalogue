@@ -6,135 +6,127 @@ using namespace std;
 namespace json {
 
 	//-------------методы ядра билдера-----------------------------------------------------------
-	KeyContext Builder::Key(string key) {
+	KeyContext Builder::Key(string k) {
 
-		if (nodes_stack_.empty() && root_initialized_) { //закончены построения всех узлов
-			throw logic_error("Trying to add dict key to finished document!");
+		if (nodes_stack_.empty()) { 
+			throw logic_error("Incorrect Key() call!");
 		}
 
-		if (!nodes_stack_.back()->IsDict() || previous_is_key_) {
-			throw std::logic_error("Wrong Key() call!");
+		if (!nodes_stack_.back()->IsDict()) {
+			throw std::logic_error("Incorrect Key() call!");
 		}
-		previous_is_key_ = true;
-		key_ = move(key);
+
+		//key_ = move(key);
+		Node* key = new Node{ move(k) }; 
+		nodes_stack_.push_back(key); //храним ключ в nodes_stack_
 		return { *this };
 	}
 
 	Builder& Builder::Value(Node value) {
 
-		if (!nodes_stack_.empty() && nodes_stack_.back()->IsDict()) { //в данный момент строится узел Dict
-			if (previous_is_key_) {
+		if (!nodes_stack_.empty() && nodes_stack_.back()->IsString()) { //в данный момент строится узел Dict, последний элемент - ключ
+
+			string key = nodes_stack_.back()->AsString(); //достаем ключ
+			delete nodes_stack_.back(); //устраняем утечки
+			nodes_stack_.pop_back();
+
+			if (!nodes_stack_.empty() && nodes_stack_.back()->IsDict()) { //за ключом должен лежать соответствующий словарь
 				Dict& cur_dict = const_cast<Dict&>(nodes_stack_.back()->AsDict());
-				cur_dict.insert({ key_, move(value) });
-				previous_is_key_ = false;
+				cur_dict.insert({ key, move(value) });
 			}
 			else {
-				throw logic_error("Value must follow a key!");
+				throw logic_error("Logic error!");
 			}
 		}
 		else if (!nodes_stack_.empty() && nodes_stack_.back()->IsArray()) { //в данный момент строится узел Array
-
 			Array& cur_array = const_cast<Array&>(nodes_stack_.back()->AsArray());
 			cur_array.emplace_back(move(value));
 		}
-		else if (nodes_stack_.empty() && !root_initialized_) { //value задается сразу после конструктора  
-
-			root_initialized_ = true;
+		else if (nodes_stack_.empty()) { //value задается сразу после конструктора  
 			root_ = move(value);
-		}
-		else if (nodes_stack_.empty() && root_initialized_) { //закончены построения всех узлов
-
-			throw logic_error("Trying to add value to finished document!");
+			nodes_stack_.push_back(&root_);
 		}
 		return *this;
 	}
 
-	DictItemContext Builder::StartDict() {
+	void Builder::AddItem(Node node) {
 
-		if (nodes_stack_.empty() && root_initialized_) { //закончены построения всех узлов
-			throw logic_error("Trying to add dict to finished document!");
-		}
-		else if (nodes_stack_.empty() && !root_initialized_) { //вызов startdict сразу после конструктора
-			root_initialized_ = true;
-			root_ = Dict{};
+		if (nodes_stack_.empty()) { //вызов сразу после конструктора
+			root_ = node;
 			nodes_stack_.push_back(&root_);
 		}
-		else if (!nodes_stack_.empty() && nodes_stack_.back()->IsArray()) { //dict это новый элемент array
+		else if (!nodes_stack_.empty() && nodes_stack_.back()->IsArray()) { //это новый элемент array
 			Array& cur_array = const_cast<Array&>(nodes_stack_.back()->AsArray());
-			cur_array.emplace_back(Node(Dict{}));
+			cur_array.emplace_back(node);
 			nodes_stack_.push_back(&cur_array.back());
 		}
-		else if (!nodes_stack_.empty() && nodes_stack_.back()->IsDict() && previous_is_key_) { //dict это value, а до этого был задан key
-			Dict& cur_dict = const_cast<Dict&>(nodes_stack_.back()->AsDict());
-			cur_dict.insert({ key_, Dict{} });
-			previous_is_key_ = false;
-			nodes_stack_.push_back(&cur_dict.at(key_));
+		else if (!nodes_stack_.empty() && nodes_stack_.back()->IsString()) { //это value, а до этого был задан key
+
+			string key = nodes_stack_.back()->AsString(); //достаем ключ
+			delete nodes_stack_.back(); //устраняем утечки
+			nodes_stack_.pop_back();
+
+			if (!nodes_stack_.empty() && nodes_stack_.back()->IsDict()) { //за ключом должен лежать соответствующий словарь
+				Dict& cur_dict = const_cast<Dict&>(nodes_stack_.back()->AsDict());
+				cur_dict.insert({ key, node });
+				nodes_stack_.push_back(&cur_dict.at(key));
+			}
+			else {
+				throw logic_error("Logic error!");
+			}
 		}
-		else { //все остальные вызовы start dict недопустимы
-			throw logic_error("Wrong StartDict() call!");
+		else { //все остальные вызовы start недопустимы
+			throw logic_error("Incorrect Start<item>() call!");
 		}
+	}
+
+	ArrayItemContext Builder::StartArray() {
+
+		AddItem(Array{});
+		return { *this };
+	}
+
+	DictItemContext Builder::StartDict() {
+
+		AddItem(Dict{});
 		return { *this };
 	}
 
 	Builder& Builder::EndDict() {
 
-		if (nodes_stack_.empty() && root_initialized_) { //закончены построения всех узлов
-			throw logic_error("Trying to add dict to finished document!");
+		if (nodes_stack_.empty()) { //вызов EndDict() первым
+			throw logic_error("Incorrect EndDict() call!");
 		}
 
-		if (!nodes_stack_.back()->IsDict() || previous_is_key_) {
+		if (!nodes_stack_.back()->IsDict()) {
 			throw std::logic_error("Incorrect EndDict() call!");
 		}
 
+		if (nodes_stack_.size() != 1){ //последний(первый в векторе) узел Node закрываем через Build
 		nodes_stack_.pop_back();
+		}
 		return *this;
-	}
-
-	ArrayItemContext Builder::StartArray() {
-
-		if (nodes_stack_.empty() && root_initialized_) { //закончены построения всех узлов
-			throw logic_error("Trying to add array to finished document!");
-		}
-		else if (nodes_stack_.empty() && !root_initialized_) { //вызов startarray сразу после конструктора
-			root_initialized_ = true;
-			root_ = Array{};
-			nodes_stack_.push_back(&root_);
-		}
-		else if (!nodes_stack_.empty() && nodes_stack_.back()->IsArray()) { //array это новый элемент array
-			Array& cur_array = const_cast<Array&>(nodes_stack_.back()->AsArray());
-			cur_array.emplace_back(Node(Array{}));
-			nodes_stack_.push_back(&cur_array.back());
-		}
-		else if (!nodes_stack_.empty() && nodes_stack_.back()->IsDict() && previous_is_key_) { //array это value, а до этого был задан key
-			Dict& cur_dict = const_cast<Dict&>(nodes_stack_.back()->AsDict());
-			cur_dict.insert({ key_, Array{} });
-			previous_is_key_ = false;
-			nodes_stack_.push_back(&cur_dict.at(key_));
-		}
-		else { //все остальные вызовы start array недопустимы
-			throw logic_error("Wrong StartArray() call!");
-		}
-		return { *this };
-
 	}
 
 	Builder& Builder::EndArray() {
 
-		if (nodes_stack_.empty() && root_initialized_) { //закончены построения всех узлов
-			throw logic_error("Trying to add array to finished document!");
+		if (nodes_stack_.empty()) { //закончены построения всех узлов
+			throw logic_error("Incorrect EndArray() call!");
 		}
 
 		if (!nodes_stack_.back()->IsArray()) {
-			throw std::logic_error("Incorrect array synthax!");
+			throw std::logic_error("Incorrect EndArray() call!");
 		}
 
+		if (nodes_stack_.size() != 1){ //последний(первый в векторе) узел Node закрываем через Build
 		nodes_stack_.pop_back();
+		}
 		return *this;
 	}
 
 	Node Builder::Build() {
 
-		if (!nodes_stack_.empty() || !root_initialized_) { //есть незаконченные узлы или метод вызван сразу после конструктора
+		if (nodes_stack_.empty() || (nodes_stack_.size() != 1)) { //метод вызван сразу после конструктора или есть незаконченные узлы (root всегда первый узел)
 			throw logic_error("Build should be used when a document is ready!");
 		}
 
@@ -143,38 +135,50 @@ namespace json {
 	//-----------------------------------------------------------------
 
 	
-	DictItemContext DictAndArrayMethods::StartDict() {
+	DictItemContext Context::StartDict() {
 		builder.StartDict();
 		return { builder };
 	}
 
-	ArrayItemContext DictAndArrayMethods::StartArray() {
+	ArrayItemContext Context::StartArray() {
 		builder.StartArray();
 		return { builder };
 	}
 
-	KeyContext KeyAndEndDictMethods::Key(std::string key) {
+	KeyContext Context::Key(std::string key) {
 		builder.Key(move(key));
 		return { builder };
 	}
 
-	Builder& KeyAndEndDictMethods::EndDict() {
+	Builder& Context::EndDict() {
 		builder.EndDict();
 		return builder;
 	}
 
-	ValueInArrayContext ValueInArrayAndEndArrayMethods::Value(Node value) {
+	ValueInArrayContext Context::ValueInArray(Node value) {
 		builder.Value(move(value));
 		return { builder };
 	}
 
-	Builder& ValueInArrayAndEndArrayMethods::EndArray() {
+	Builder& Context::EndArray() {
 		builder.EndArray();
 		return builder;
 	}
 
-	ValueInDictContext ValueInDictMethods::Value(Node value) {
+	ValueInDictContext Context::ValueInDict(Node value) {
 		builder.Value(move(value));
 		return { builder };
+	}
+
+	ValueInDictContext KeyContext::Value(Node value) {
+		return ValueInDict(value);
+	}
+
+	ValueInArrayContext ValueInArrayContext::Value(Node value) {
+		return ValueInArray(value);
+	}
+
+	ValueInArrayContext ArrayItemContext::Value(Node value) {
+		return ValueInArray(value);
 	}
 }

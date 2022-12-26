@@ -38,15 +38,16 @@ namespace json {
 		Node Build();
 
 	private:
+
+		void AddItem(Node node);
+
 		Node root_;
 		std::vector<Node*> nodes_stack_;
-		bool previous_is_key_ = false;
-		std::string key_ = "";
-		bool root_initialized_ = false;
 	};
 
 	//Базовый класс хранящий ссылку на билдер
 	class Context {
+
 	public:
 		Context(Builder& b)
 			:builder(b)
@@ -55,97 +56,79 @@ namespace json {
 
 		Builder& builder;
 
-		Builder& GetBuilder() {
-			return builder;
-		}
-	};
-
-	//------Базовые классы реализующие методы-----------------
-	class DictAndArrayMethods : private Context {
-	public:
-		DictAndArrayMethods(Builder& b)
-			:Context(b)
-		{
-		}
-
 		DictItemContext StartDict();
 
 		ArrayItemContext StartArray();
-	};
-
-	class KeyAndEndDictMethods : private Context {
-	public:
-		KeyAndEndDictMethods(Builder& b)
-			:Context(b)
-		{
-		}
 
 		KeyContext Key(std::string key);
 
 		Builder& EndDict();
-	};
 
-	class ValueInArrayAndEndArrayMethods : private Context {
-	public:
-		ValueInArrayAndEndArrayMethods(Builder& b)
-			:Context(b)
-		{
-		}
-
-		ValueInArrayContext Value(Node value);
+		ValueInArrayContext ValueInArray(Node value);
 
 		Builder& EndArray();
+
+		ValueInDictContext ValueInDict(Node value);
 	};
 
-	class ValueInDictMethods : private Context {
+	class KeyContext : private Context {
 	public:
-		ValueInDictMethods(Builder& b)
+		KeyContext(Builder& b)
 			:Context(b)
 		{
 		}
 
+		using Context::StartDict;
+		using Context::StartArray;
 		ValueInDictContext Value(Node value);
 	};
-	//----------------------------------------------------------
 
-	class KeyContext : public DictAndArrayMethods, public ValueInDictMethods {
-	public:
-		KeyContext(Builder& b)
-			:DictAndArrayMethods(b), ValueInDictMethods(b)
-		{
-		}
-	};
-
-	class ValueInArrayContext : public DictAndArrayMethods, public ValueInArrayAndEndArrayMethods {
+	class ValueInArrayContext : private Context {
 	public:
 		ValueInArrayContext(Builder& b)
-			:DictAndArrayMethods(b), ValueInArrayAndEndArrayMethods(b)
+			:Context(b)
 		{
 		}
+
+		using Context::StartDict;
+		using Context::StartArray;
+		ValueInArrayContext Value(Node value);
+		using Context::EndArray;
 	};
 
-	class ArrayItemContext : public DictAndArrayMethods, public ValueInArrayAndEndArrayMethods {
+	class ArrayItemContext : private Context {
 	public:
 		ArrayItemContext(Builder& b)
-			:DictAndArrayMethods(b), ValueInArrayAndEndArrayMethods(b)
+			:Context(b)
 		{
 		}
+
+		using Context::StartDict;
+		using Context::StartArray;
+		ValueInArrayContext Value(Node value);
+		using Context::EndArray;
 	};
 
-	class DictItemContext : public KeyAndEndDictMethods {
+	class DictItemContext : private Context {
 	public:
 		DictItemContext(Builder& b)
-			:KeyAndEndDictMethods(b)
+			:Context(b)
 		{
 		}
+
+		using Context::Key;
+		using Context::EndDict;
 	};
 
-	class ValueInDictContext : public KeyAndEndDictMethods {
+	class ValueInDictContext : private Context {
 	public:
 		ValueInDictContext(Builder& b)
-			:KeyAndEndDictMethods(b)
+			:Context(b)
 		{
 		}
+
+		using Context::Key;
+		using Context::EndDict;
 	};
 }
 
