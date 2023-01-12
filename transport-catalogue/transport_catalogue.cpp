@@ -143,5 +143,9 @@ namespace Catalogue {
 		}
 		return out;
 	}
+
+	const unordered_map<pair<const Stop*, const Stop*>, size_t, PointerPairHasher>& TransportCatalogue::GetDistances() const {
+		return distances_;
+	}
 }
 

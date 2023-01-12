@@ -7,7 +7,7 @@
 namespace DataBaseInterface {
 
 	RequestsHandler::RequestsHandler(Catalogue::TransportCatalogue& catalogue)
-		:catalogue_(catalogue)
+		:Modules::Module(Modules::ModuleType::RequestHandler), catalogue_(catalogue)
 	{
 	}
 
@@ -40,6 +40,10 @@ namespace DataBaseInterface {
 
 	std::vector<Catalogue::Bus*> RequestsHandler::GetAllBuses() {
 		return std::move(catalogue_.GetAllBuses());
+	}
+
+	const std::unordered_map<std::pair<const Catalogue::Stop*, const Catalogue::Stop*>, std::size_t, Catalogue::PointerPairHasher>& RequestsHandler::GetDistances() const {
+		return catalogue_.GetDistances();
 	}
 
 }

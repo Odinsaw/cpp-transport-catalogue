@@ -75,7 +75,7 @@ namespace Visual {
     {
         std::sort(buses_.begin(), buses_.end(), [](Catalogue::Bus* lhs, Catalogue::Bus* rhs) {
             return lhs->name < rhs->name;
-            }); //отрисовываем в алфовитном порядке
+            }); //отрисовываем в алфавитном порядке
 
         std::unordered_set<Catalogue::Stop*> stops;
         for (const auto bus : buses_) {
@@ -202,4 +202,24 @@ namespace Visual {
         return lhs->name < rhs->name;
     }
 
+    MapRenderer::MapRenderer(MapSettings settings, std::vector<Catalogue::Bus*> buses)
+        :Modules::Module(Modules::ModuleType::MapRenderer)
+    {
+
+        Visual::Map map(settings, buses);
+
+        std::stringstream strm;
+
+        svg::Document doc;
+        map.Draw(doc);
+        doc.Render(strm);
+
+        std::string map_string = strm.str();
+        strm.str(std::string());
+        map_ = map_string;
+    }
+
+    std::string MapRenderer::GetMap() {
+        return map_;
+    }
 }

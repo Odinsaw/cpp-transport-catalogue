@@ -4,11 +4,61 @@
 
 namespace DataReader {
 
+	using namespace std::literals;
+
+	JsonReader::JsonReader(std::istream& input, Catalogue::TransportCatalogue& catalogue)
+		:input_document_(json::Load(input))
+		{
+		handler_ = std::make_unique<DataBaseInterface::RequestsHandler>(catalogue);
+			bool correct_root = std::holds_alternative<json::Dict>(input_document_.GetRoot().GetValue());
+			assert(correct_root); //в корневом узле должен быть словарь {base_requests : ... , stat_requests : ...}
+		}
+
 	JsonReader::JsonReader(std::istream& input, std::unique_ptr<DataBaseInterface::RequestsHandler>&& handler)
 		:input_document_(json::Load(input)), handler_(std::move(handler))
 	{
 		bool correct_root = std::holds_alternative<json::Dict>(input_document_.GetRoot().GetValue());
 		assert(correct_root); //в корневом узле должен быть словарь {base_requests : ... , stat_requests : ...}
+	}
+
+	JsonReader& JsonReader::SetNewRequestHandler(Catalogue::TransportCatalogue& catalogue) {
+		std::unique_ptr<Modules::Module> new_handler = std::make_unique<DataBaseInterface::RequestsHandler>(catalogue);
+		modules_[Modules::ModuleType::TransportRouter] = std::move(new_handler);
+		return *this;
+	}
+	JsonReader& JsonReader::SetNewRequestHandler(std::unique_ptr<DataBaseInterface::RequestsHandler> new_handler) {
+		modules_[Modules::ModuleType::TransportRouter] = std::move(new_handler);
+		return *this;
+	}
+
+	JsonReader& JsonReader::SetNewMap() {
+		std::unique_ptr<Modules::Module> new_map = std::make_unique<Visual::MapRenderer>(ReadMapSettings(), handler_->GetAllBuses());
+		modules_[Modules::ModuleType::MapRenderer] = std::move(new_map);
+		return *this;
+	}
+	JsonReader& JsonReader::SetNewMap(Visual::MapSettings settings) {
+		std::unique_ptr<Modules::Module> new_map = std::make_unique<Visual::MapRenderer>(settings, handler_->GetAllBuses());
+		modules_[Modules::ModuleType::MapRenderer] = std::move(new_map);
+		return *this;
+	}
+	JsonReader& JsonReader::SetNewMap(std::unique_ptr<Visual::MapRenderer> new_renderer) {
+		modules_[Modules::ModuleType::MapRenderer] = std::move(new_renderer);
+		return *this;
+	}
+
+	JsonReader& JsonReader::SetNewTransportRouter() {
+		std::unique_ptr<Modules::Module> new_router = std::make_unique<Router::TransportRouter>(ReadRouterSettings(), handler_->GetAllBuses(), handler_->GetDistances());
+		modules_[Modules::ModuleType::TransportRouter] = std::move(new_router);
+		return *this;
+	}
+	JsonReader& JsonReader::SetNewTransportRouter(Router::RouterSettings settings) {
+		std::unique_ptr<Modules::Module> new_router = std::make_unique<Router::TransportRouter>(settings, handler_->GetAllBuses(), handler_->GetDistances());
+		modules_[Modules::ModuleType::TransportRouter] = std::move(new_router);
+		return *this;
+	}
+	JsonReader& JsonReader::SetNewTransportRouter(std::unique_ptr<Router::TransportRouter> new_router) {
+		modules_[Modules::ModuleType::TransportRouter] = std::move(new_router);
+		return *this;
 	}
 
 	void JsonReader::ReadBusesBaseRequests() {
@@ -187,11 +237,17 @@ if (root_dict.count("base_requests")) {
 					assert(std::holds_alternative<int>(stat_request.at("id").GetValue())); //id только целое число
 					int id = std::get<int>(stat_request.at("id").GetValue());
 
-					json::Document result = MakeMapJSON(id);
+					std::string map_string = DoMapRequest();
+					json::Document result = MakeMapJSON(id, map_string);
+					answered_requests.push_back(std::move(result));
+				}
+				else if (stat_request_type == "Route") {
+					RouteRequest request_parsed = ReadRouteRequest(stat_request);
+					std::optional<Router::TransportRouter::RouteInfo> route = DoRouteRequest(request_parsed);
+					json::Document result = MakeRouteJSON(request_parsed.id, route);
 					answered_requests.push_back(std::move(result));
 				}
 			}
-
 			json::Array out_requests;
 			for (const auto& doc : answered_requests) {
 				out_requests.emplace_back(doc.GetRoot());
@@ -199,6 +255,45 @@ if (root_dict.count("base_requests")) {
 			json::Document result_node{ json::Builder{}.Value(out_requests).Build() };
 			json::Print(result_node, output);
 		}
+	}
+
+	JsonReader::RouteRequest JsonReader::ReadRouteRequest(const json::Dict stat_request) {
+		assert(stat_request.count("from") && stat_request.count("to")); //запрос должен откуда и куда
+		assert(std::holds_alternative<std::string>(stat_request.at("from").GetValue())); //в виде строки
+		assert(std::holds_alternative<std::string>(stat_request.at("to").GetValue())); //в виде строки
+		std::string to = std::get<std::string>(stat_request.at("to").GetValue());
+		std::string from = std::get<std::string>(stat_request.at("from").GetValue());
+
+		assert(std::holds_alternative<int>(stat_request.at("id").GetValue())); //id только целое число
+		int id = std::get<int>(stat_request.at("id").GetValue());
+		return { from, to, id };
+	}
+
+	std::optional<Router::TransportRouter::RouteInfo> JsonReader::DoRouteRequest(RouteRequest request_parsed) {
+
+		if (!modules_.count(Modules::ModuleType::TransportRouter)
+			|| modules_.at(Modules::ModuleType::TransportRouter) == nullptr
+			|| modules_.at(Modules::ModuleType::TransportRouter)->type != Modules::ModuleType::TransportRouter) {
+			SetNewTransportRouter();
+		}
+
+		Modules::Module* cur_module = modules_.at(Modules::ModuleType::TransportRouter).get();
+		Router::TransportRouter* router = dynamic_cast<Router::TransportRouter*>(cur_module);
+		return router->FindRoute(
+		handler_->GetStop(request_parsed.from), handler_->GetStop(request_parsed.to));
+	}
+
+	std::string JsonReader::DoMapRequest() {
+
+		if (!modules_.count(Modules::ModuleType::MapRenderer)
+			|| modules_.at(Modules::ModuleType::MapRenderer) == nullptr
+			|| modules_.at(Modules::ModuleType::MapRenderer)->type != Modules::ModuleType::MapRenderer) {
+			SetNewMap();
+		}
+
+		Modules::Module* cur_module = modules_.at(Modules::ModuleType::MapRenderer).get();
+		Visual::MapRenderer* map = dynamic_cast<Visual::MapRenderer*>(cur_module);
+		return map->GetMap();
 	}
 
 	std::pair<int, std::string> JsonReader::ReadStatRequest(const json::Dict stat_request) {
@@ -214,7 +309,7 @@ if (root_dict.count("base_requests")) {
 	json::Document JsonReader::MakeBusInfoJSON(int id, Catalogue::BusInfo& bus_info) {
 
 		if (bus_info.is_not_found) {
-			json::Document result_node{ json::Builder{}.StartDict().Key("request_id").Value(id).Key("error_message").Value("not found").EndDict().Build() };
+			json::Document result_node{ json::Builder{}.StartDict().Key("request_id").Value(id).Key("error_message").Value("not found"s).EndDict().Build() };
 			return result_node;
 		}
 
@@ -228,7 +323,7 @@ if (root_dict.count("base_requests")) {
 	json::Document JsonReader::MakeStopInfoJSON(int id, Catalogue::StopInfo& stop_info) {
 
 		if (stop_info.is_not_found) {
-			json::Document result_node{ json::Builder{}.StartDict().Key("request_id").Value(id).Key("error_message").Value("not found").EndDict().Build()};
+			json::Document result_node{ json::Builder{}.StartDict().Key("request_id").Value(id).Key("error_message").Value("not found"s).EndDict().Build()};
 			return result_node;
 		}
 
@@ -247,7 +342,7 @@ if (root_dict.count("base_requests")) {
 		json::Dict root_dict = std::get<json::Dict>(input_document_.GetRoot().GetValue());
 		Visual::MapSettings settings;
 
-		if (root_dict.count("stat_requests")) {
+		if (root_dict.count("render_settings")) {
 
 			bool correct_settings = std::holds_alternative<json::Dict>(root_dict.at("render_settings").GetValue());
 			assert(correct_settings); //в узле render_settings должен быть словарь
@@ -295,6 +390,25 @@ if (root_dict.count("base_requests")) {
 		return settings;
 	}
 
+	Router::RouterSettings JsonReader::ReadRouterSettings() {
+
+		json::Dict root_dict = std::get<json::Dict>(input_document_.GetRoot().GetValue());
+		Router::RouterSettings settings;
+
+		if (root_dict.count("routing_settings")) {
+
+			bool correct_settings = std::holds_alternative<json::Dict>(root_dict.at("routing_settings").GetValue());
+			assert(correct_settings); //в узле render_settings должен быть словарь
+			json::Dict settings_from_json = std::get<json::Dict>(root_dict.at("routing_settings").GetValue());
+
+			assert(settings_from_json.count("bus_velocity") && settings_from_json.count("bus_wait_time"));
+
+			settings.bus_wait_time = settings_from_json.at("bus_wait_time").AsDouble();
+			settings.bus_velocity = settings_from_json.at("bus_velocity").AsDouble();
+		}
+		return settings;
+	}
+
 	svg::Color GetColorFromNode(json::Node node) {
 
 		assert(node.IsString() || node.IsArray());
@@ -323,20 +437,53 @@ if (root_dict.count("base_requests")) {
 		return svg::Color{ svg::NoneColor };
 	}
 
-	json::Document JsonReader::MakeMapJSON(int id) {
+	json::Document JsonReader::MakeMapJSON(int id, std::string map_string) {
 
-		Visual::Map map(ReadMapSettings(), handler_->GetAllBuses());
+		json::Document result_node{ json::Builder{}.StartDict().Key("map").Value(std::move(map_string)).Key("request_id").Value(id).EndDict().Build() };
 
-		std::stringstream strm;
+		return result_node;
+	}
 
-		svg::Document doc;
-		map.Draw(doc);
-		doc.Render(strm);
+	json::Document JsonReader::MakeRouteJSON(int id, std::optional<Router::TransportRouter::RouteInfo> route) {
 
-		std::string map_string = strm.str();
-		strm.str(std::string());
+		using RouteItemType = Router::TransportRouter::RouteItem::ItemType;
 
-		json::Document result_node{ json::Builder{}.StartDict().Key("map").Value(map_string).Key("request_id").Value(id).EndDict().Build() };
+		if (route == std::nullopt) {
+			json::Document result_node{ json::Builder{}.StartDict().Key("request_id").Value(id).Key("error_message").Value("not found"s).EndDict().Build() };
+			return result_node;
+		}
+
+		std::vector<json::Node> items;
+		for (Router::TransportRouter::RouteItemPtr item : route.value().route_items) {
+
+			if (item->GetType() == RouteItemType::WaitItem) {
+
+				Router::TransportRouter::WaitItem* w_item = dynamic_cast<Router::TransportRouter::WaitItem*>(item.get());
+				json::Node wait{ json::Builder{}.StartDict()
+					.Key("stop_name"s).Value(w_item->stop->name)
+					.Key("time"s).Value(w_item->time)
+					.Key("type"s).Value("Wait"s)
+					.EndDict().Build()};
+				items.push_back(wait);
+			}
+			else if (item->GetType() == RouteItemType::BusItem) {
+
+				Router::TransportRouter::BusItem* b_item = dynamic_cast<Router::TransportRouter::BusItem*>(item.get());
+				json::Node bus{ json::Builder{}.StartDict()
+					.Key("bus"s).Value(b_item->bus->name)
+					.Key("span_count"s).Value(static_cast<int>(b_item->span_count))
+					.Key("time"s).Value(b_item->time)
+					.Key("type"s).Value("Bus"s)
+					.EndDict().Build() };
+				items.push_back(bus);
+			}
+		}
+
+		json::Document result_node{ json::Builder{}.StartDict()
+			.Key("items").Value(items)
+			.Key("request_id").Value(id)
+			.Key("total_time").Value(route.value().time)
+			.EndDict().Build() };
 
 		return result_node;
 	}

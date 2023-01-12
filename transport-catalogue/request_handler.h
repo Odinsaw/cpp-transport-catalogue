@@ -10,7 +10,7 @@ namespace DataBaseInterface{
 
     using namespace  std::literals;
 
-    class RequestsHandler {
+    class RequestsHandler : public Modules::Module {
 
     public:
 
@@ -23,6 +23,11 @@ namespace DataBaseInterface{
         Catalogue::BusInfo DoBusStatRequest(std::string bus_name); //получить информацию по маршруту
 
         std::vector<Catalogue::Bus*> GetAllBuses();
+        const std::unordered_map<std::pair<const Catalogue::Stop*, const Catalogue::Stop*>, std::size_t, Catalogue::PointerPairHasher>& GetDistances() const;
+
+        Catalogue::Stop* GetStop(std::string stop) {
+            return catalogue_.GetStop(stop);
+        }
 
     private:
     Catalogue::TransportCatalogue& catalogue_; //каталог, с которым будем работать

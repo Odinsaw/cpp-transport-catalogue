@@ -6,6 +6,7 @@
 #include <cassert>
 #include <map>
 #include <algorithm>
+#include <sstream>
 
 namespace Visual {
 
@@ -32,6 +33,13 @@ namespace Visual {
         std::map<Catalogue::Stop*, svg::Point, LexicSorterByName> stops_positions_;
     };
 
-} 
+    class MapRenderer : public Modules::Module {
+    public:
+        MapRenderer(MapSettings settings, std::vector<Catalogue::Bus*> buses);
 
-//bool CheckSymmetricTrip(const std::vector<Catalogue::Stop*>& stops);
+        std::string GetMap();
+
+    private:
+        std::string map_;
+    };
+} 
