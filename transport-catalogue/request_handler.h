@@ -1,6 +1,7 @@
 #pragma once
 #include "transport_catalogue.h"
 #include "json.h"
+#include "transport_router.h"
 #include <iostream>
 #include <cassert>
 #include "map_renderer.h"
@@ -13,6 +14,11 @@ namespace DataBaseInterface{
     class RequestsHandler : public Modules::Module {
 
     public:
+
+        struct RouteInfo {
+            std::optional<Router::TransportRouter::RouteInfo> route;
+            std::unique_ptr<Router::TransportRouter> router;
+        };
 
         RequestsHandler(Catalogue::TransportCatalogue& catalogue);
 
@@ -28,6 +34,9 @@ namespace DataBaseInterface{
         Catalogue::Stop* GetStop(std::string stop) {
             return catalogue_.GetStop(stop);
         }
+
+        RouteInfo FindRoute(Router::RouterSettings settings, std::string stop_from, std::string stop_to);
+        std::unique_ptr<Router::TransportRouter> MakeRouter(Router::RouterSettings settings);
 
     private:
     Catalogue::TransportCatalogue& catalogue_; //каталог, с которым будем работать

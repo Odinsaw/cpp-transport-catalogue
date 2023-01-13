@@ -84,9 +84,10 @@ namespace Router {
 			Time time;
 		};
 
+		TransportRouter(RouterSettings settings, Catalogue::TransportCatalogue& catalogue);
 		TransportRouter(RouterSettings settings, std::vector<Catalogue::Bus*> buses, Distances& distances);
 
-		std::optional<RouteInfo> FindRoute(const Catalogue::Stop* start, const Catalogue::Stop* stop) const;
+		std::optional<RouteInfo> FindRoute(const Catalogue::Stop* stop_from, const Catalogue::Stop* stop_to) const;
 
 	private:
 

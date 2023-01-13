@@ -16,6 +16,11 @@ namespace Router {
 		router_ = std::make_unique<graph::Router<Time>>(*graph_);
 	}
 
+	TransportRouter::TransportRouter(RouterSettings settings, Catalogue::TransportCatalogue& catalogue)
+		:TransportRouter::TransportRouter(settings, catalogue.GetAllBuses(), catalogue.GetDistances())
+	{
+	}
+
 	void TransportRouter::LoadGraph() {
 		LoadStopsToGraph();
 		LoadBusesToGraph();
@@ -37,6 +42,8 @@ namespace Router {
 
 	void TransportRouter::LoadBusesToGraph() {
 
+		static const double units_coeff = 60.0 / 1000;
+
 		for (const Catalogue::Bus* bus : buses_) {
 
 			const vector<Catalogue::Stop*>& bus_stops = bus->stops;
@@ -56,7 +63,7 @@ namespace Router {
 
 					distance += GetDistance(bus_stops[reachable_stop - 1], bus_stops[reachable_stop]); //расстояния от текущей до достижимой остановки
 
-					Time time = (distance * 60) / (settings_.bus_velocity * 1000.0); //км/ч в м/с
+					Time time = (distance * units_coeff) / settings_.bus_velocity; //км/ч в м/с за счет units_coeff
 					graph::EdgeId fresh_edge_id = graph_->AddEdge({cur_stop_id, stop_to_id_.at(bus_stops[reachable_stop]).in, time});
 					RouteItemPtr fresh_bus_item = make_shared<BusItem>(bus, reachable_stop - cur_stop, time);
 					route_items_.insert(route_items_.begin() + fresh_edge_id, move(fresh_bus_item));
@@ -65,16 +72,16 @@ namespace Router {
 		}
 	}
 
-	optional<TransportRouter::RouteInfo> TransportRouter::FindRoute(const Catalogue::Stop* start, const Catalogue::Stop* stop) const {
+	optional<TransportRouter::RouteInfo> TransportRouter::FindRoute(const Catalogue::Stop* stop_from, const Catalogue::Stop* stop_to) const {
 
 		RouteInfo route_info;
 
-		if (!stop_to_id_.count(start) || !stop_to_id_.count(stop)) {
+		if (!stop_to_id_.count(stop_from) || !stop_to_id_.count(stop_to)) {
 			return nullopt;
 		}
 
-		 StopAsEdge departure = stop_to_id_.at(start);
-		 StopAsEdge arrival = stop_to_id_.at(stop);
+		 StopAsEdge departure = stop_to_id_.at(stop_from);
+		 StopAsEdge arrival = stop_to_id_.at(stop_to);
 
 		 optional<graph::Router<Time>::RouteInfo> route = router_->BuildRoute(departure.in, arrival.in);
 

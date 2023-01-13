@@ -46,4 +46,15 @@ namespace DataBaseInterface {
 		return catalogue_.GetDistances();
 	}
 
+	RequestsHandler::RouteInfo RequestsHandler::FindRoute(Router::RouterSettings settings, 
+		std::string stop_from, std::string stop_to) {
+			RouteInfo route_info;
+			route_info.router = MakeRouter(settings);
+			route_info.route = route_info.router->FindRoute(GetStop(stop_from), GetStop(stop_to));
+			return route_info;
+	}
+
+	std::unique_ptr<Router::TransportRouter> RequestsHandler::MakeRouter(Router::RouterSettings settings) {
+		return std::make_unique<Router::TransportRouter>(settings, catalogue_);
+	}
 }

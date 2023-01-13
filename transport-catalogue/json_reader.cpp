@@ -47,12 +47,12 @@ namespace DataReader {
 	}
 
 	JsonReader& JsonReader::SetNewTransportRouter() {
-		std::unique_ptr<Modules::Module> new_router = std::make_unique<Router::TransportRouter>(ReadRouterSettings(), handler_->GetAllBuses(), handler_->GetDistances());
+		std::unique_ptr<Modules::Module> new_router = handler_->MakeRouter(ReadRouterSettings());
 		modules_[Modules::ModuleType::TransportRouter] = std::move(new_router);
 		return *this;
 	}
 	JsonReader& JsonReader::SetNewTransportRouter(Router::RouterSettings settings) {
-		std::unique_ptr<Modules::Module> new_router = std::make_unique<Router::TransportRouter>(settings, handler_->GetAllBuses(), handler_->GetDistances());
+		std::unique_ptr<Modules::Module> new_router = handler_->MakeRouter(settings);
 		modules_[Modules::ModuleType::TransportRouter] = std::move(new_router);
 		return *this;
 	}
