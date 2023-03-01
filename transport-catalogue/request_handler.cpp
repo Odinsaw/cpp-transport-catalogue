@@ -38,8 +38,12 @@ namespace DataBaseInterface {
 		return catalogue_.GetBusInfo(bus_name);
 	}
 
-	std::vector<Catalogue::Bus*> RequestsHandler::GetAllBuses() {
+	std::vector<const Catalogue::Bus*> RequestsHandler::GetAllBuses() {
 		return std::move(catalogue_.GetAllBuses());
+	}
+
+	std::vector<const Catalogue::Stop*> RequestsHandler::GetAllStops() {
+		return std::move(catalogue_.GetAllStops());
 	}
 
 	const std::unordered_map<std::pair<const Catalogue::Stop*, const Catalogue::Stop*>, std::size_t, Catalogue::PointerPairHasher>& RequestsHandler::GetDistances() const {
@@ -56,5 +60,13 @@ namespace DataBaseInterface {
 
 	std::unique_ptr<Router::TransportRouter> RequestsHandler::MakeRouter(Router::RouterSettings settings) {
 		return std::make_unique<Router::TransportRouter>(settings, catalogue_);
+	}
+
+	void RequestsHandler::DoSerialization(std::filesystem::path file, const Visual::MapSettings& map_settings, const Router::TransportRouter& router) {
+		Serialization::DoSerialization(file, catalogue_, map_settings, router);
+	}
+
+	void RequestsHandler::DoDeSerialization(std::filesystem::path file, Visual::MapSettings& map_settings, Router::TransportRouter& router) {
+		Serialization::DoDeSerialization(file, catalogue_, map_settings, router);
 	}
 }

@@ -36,12 +36,19 @@ namespace Catalogue{
 
 		StopInfo GetBusesForStop(std::string name);//возвращаем структуру с информацией по остановке
 
-		std::vector<Bus*> GetAllBuses();
+		std::vector<const Bus*> GetAllBuses() const;
+		std::vector<const Stop*> GetAllStops() const;
 		const std::unordered_map<std::pair<const Stop*, const Stop*>, std::size_t, PointerPairHasher>& GetDistances() const;
 
-		Stop* GetStop(std::string stop) {
-			return stopname_to_stop_[stop];
+		const Stop* GetStop(std::string stop) const{
+			return stopname_to_stop_.at(stop);
 		}
+
+		const Bus* GetBus(std::string bus) const {
+			return busname_to_bus_.at(bus);
+		}
+
+		void LoadDistances(std::unordered_map<std::pair<const Stop*, const Stop*>, std::size_t, PointerPairHasher>& distances);
 
 	private:
 		std::deque<Stop> stops_ = { Stop() }; //0 - null stop

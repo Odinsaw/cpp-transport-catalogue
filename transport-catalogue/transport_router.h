@@ -84,10 +84,23 @@ namespace Router {
 			Time time;
 		};
 
+		TransportRouter();
 		TransportRouter(RouterSettings settings, Catalogue::TransportCatalogue& catalogue);
-		TransportRouter(RouterSettings settings, std::vector<Catalogue::Bus*> buses, Distances& distances);
+		TransportRouter(RouterSettings settings, std::vector<const Catalogue::Bus*> buses, Distances& distances);
 
 		std::optional<RouteInfo> FindRoute(const Catalogue::Stop* stop_from, const Catalogue::Stop* stop_to) const;
+
+		const RouterSettings& GetRouterSettings() const;
+		const graph::DirectedWeightedGraph<Time>& GetGraph() const;
+		const std::unordered_map<const Catalogue::Stop*, StopAsEdge, PointerHasher>& GetStopToIdMap() const;
+		const std::vector<RouteItemPtr>& GetRouteItems() const;
+
+		RouterSettings& AccessRouterSettings();
+		std::unique_ptr<graph::DirectedWeightedGraph<Time>>& AccessGraph();
+		void UpdateRouter();
+		std::unordered_map<const Catalogue::Stop*, StopAsEdge, PointerHasher>& AccessStopToIdMap();
+		std::vector<RouteItemPtr>& AccessRouteItems();
+		void LoadCatalogueData(const Catalogue::TransportCatalogue& catalogue);
 
 	private:
 
@@ -96,14 +109,14 @@ namespace Router {
 		void LoadBusesToGraph();
 		double GetDistance(const Catalogue::Stop* stop1, const Catalogue::Stop* stop2) const;
 
-		std::vector<Catalogue::Bus*> buses_;
-		std::unordered_set<Catalogue::Stop*> stops_;
+		std::vector<const Catalogue::Bus*> buses_;
+		std::unordered_set<const Catalogue::Stop*> stops_;
 		std::unique_ptr<graph::DirectedWeightedGraph<Time>> graph_;
 		std::unique_ptr<graph::Router<Time>> router_;
 		RouterSettings settings_;
 		std::unordered_map<const Catalogue::Stop*, StopAsEdge, PointerHasher> stop_to_id_;
 		std::vector<RouteItemPtr> route_items_; //id ребра - индекс вектора, где лежит соотвутствующий route item 
-		Distances& distances_;
+		Distances* distances_;
 	};
 
 }

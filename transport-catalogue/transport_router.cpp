@@ -4,8 +4,15 @@ using namespace std;
 
 namespace Router {
 
-	TransportRouter::TransportRouter(RouterSettings settings, vector<Catalogue::Bus*> buses, Distances& distances)
-		:Modules::Module(Modules::ModuleType::TransportRouter), buses_(std::move(buses)), settings_(settings), distances_(distances)
+	TransportRouter::TransportRouter()
+		:Modules::Module(Modules::ModuleType::TransportRouter)
+	{
+		graph_ = std::make_unique<graph::DirectedWeightedGraph<Time>>();
+		router_ = std::make_unique<graph::Router<Time>>(*graph_);
+	}
+
+	TransportRouter::TransportRouter(RouterSettings settings, vector<const Catalogue::Bus*> buses, Distances& distances)
+		:Modules::Module(Modules::ModuleType::TransportRouter), buses_(std::move(buses)), settings_(settings), distances_(&distances)
 	{
 		for (const auto bus : buses_) {
 			stops_.insert(bus->stops.begin(), bus->stops.end());
@@ -98,15 +105,58 @@ namespace Router {
 	}
 
 	 double TransportRouter::GetDistance(const Catalogue::Stop* stop1, const Catalogue::Stop* stop2) const{
-		 if (distances_.count({ stop1, stop2 })) {
-			 return distances_.at({ stop1, stop2 });
+		 if (distances_ -> count({ stop1, stop2 })) {
+			 return distances_->at({ stop1, stop2 });
 		 }
-		 else if (distances_.count({ stop2, stop1 })) {
-			 return distances_.at({ stop2, stop1 });
+		 else if (distances_->count({ stop2, stop1 })) {
+			 return distances_->at({ stop2, stop1 });
 		 }
 		 else {
 			 throw runtime_error("No distance for a pair of stops"s);
 		 }
 	 }
 
+	 const RouterSettings& TransportRouter::GetRouterSettings() const{
+		 return settings_;
+	 }
+
+	 const graph::DirectedWeightedGraph<TransportRouter::Time>& TransportRouter::GetGraph() const {
+		 return *graph_.get();
+	 }
+
+	 const std::unordered_map<const Catalogue::Stop*, TransportRouter::StopAsEdge, TransportRouter::PointerHasher>& TransportRouter::GetStopToIdMap() const {
+		 return stop_to_id_;
+	 }
+
+	 const std::vector<TransportRouter::RouteItemPtr>& TransportRouter::GetRouteItems() const {
+		 return route_items_;
+	 }
+
+	 RouterSettings& TransportRouter::AccessRouterSettings() {
+		 return settings_;
+	 }
+
+	 std::unique_ptr<graph::DirectedWeightedGraph<TransportRouter::Time>>& TransportRouter::AccessGraph() {
+		 return graph_;
+	 }
+
+	 void TransportRouter::UpdateRouter() {
+		 router_ = std::make_unique<graph::Router<Time>>(*graph_);
+	 }
+
+	 std::unordered_map<const Catalogue::Stop*, TransportRouter::StopAsEdge, TransportRouter::PointerHasher>& TransportRouter::AccessStopToIdMap() {
+		 return stop_to_id_;
+	 }
+
+	 std::vector<TransportRouter::RouteItemPtr>& TransportRouter::AccessRouteItems() {
+		 return route_items_;
+	 }
+
+	 void TransportRouter::LoadCatalogueData(const Catalogue::TransportCatalogue& catalogue) {
+		 buses_ = catalogue.GetAllBuses();
+		 for (const auto bus : buses_) {
+			 stops_.insert(bus->stops.begin(), bus->stops.end());
+		 }
+		 distances_ = &catalogue.GetDistances();
+	 }
 }

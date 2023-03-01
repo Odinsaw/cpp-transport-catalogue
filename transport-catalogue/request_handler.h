@@ -1,11 +1,15 @@
 #pragma once
-#include "transport_catalogue.h"
-#include "json.h"
+
 #include "transport_router.h"
+#include "transport_catalogue.h"
+#include "map_renderer.h"
+#include "json.h"
+#include "serialization.h"
+
 #include <iostream>
 #include <cassert>
-#include "map_renderer.h"
 #include <memory>
+#include <filesystem>
 
 namespace DataBaseInterface{
 
@@ -24,14 +28,17 @@ namespace DataBaseInterface{
 
         void DoBusBaseRequest(std::string name, std::vector<std::string> stop_list, std::string end_stop); //добавить маршрут
         void DoStopBaseRequest(Catalogue::Stop stop, Catalogue::BusToDistance distances_map); //добавить остановку
+        void DoSerialization(std::filesystem::path file, const Visual::MapSettings& map_settings, const Router::TransportRouter& router);
+        void DoDeSerialization(std::filesystem::path file, Visual::MapSettings& map_settings, Router::TransportRouter& router);
 
         Catalogue::StopInfo DoStopStatRequest(std::string stop_name); //получить информацию по остановке
         Catalogue::BusInfo DoBusStatRequest(std::string bus_name); //получить информацию по маршруту
 
-        std::vector<Catalogue::Bus*> GetAllBuses();
+        std::vector<const Catalogue::Bus*> GetAllBuses();
+        std::vector<const Catalogue::Stop*> GetAllStops();
         const std::unordered_map<std::pair<const Catalogue::Stop*, const Catalogue::Stop*>, std::size_t, Catalogue::PointerPairHasher>& GetDistances() const;
 
-        Catalogue::Stop* GetStop(std::string stop) {
+        const Catalogue::Stop* GetStop(std::string stop) {
             return catalogue_.GetStop(stop);
         }
 

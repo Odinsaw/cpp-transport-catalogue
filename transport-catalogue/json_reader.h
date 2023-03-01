@@ -49,6 +49,8 @@ namespace DataReader {
 
 		std::tuple<std::string, std::vector<std::string>, std::string> ReadBusBaseRequest(const json::Dict base_request); //для добавления маршрута нужно имя и вектор остановок
 		std::pair<Catalogue::Stop, Catalogue::BusToDistance> ReadStopBaseRequest(const json::Dict base_request); //для добавления остановки нужна структура остановки и словарь расстояний (может быть пустым)
+		void DoSerialization();
+		void DoDeSerialization();
 
 		std::pair<int, std::string> ReadStatRequest(const json::Dict stat_request); //стат запрос это айди + имя (кроме map)
 		RouteRequest ReadRouteRequest(const json::Dict stat_request);

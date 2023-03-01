@@ -130,22 +130,40 @@ namespace Catalogue {
 		return { move(name), move(out)};
 	}
 
-	std::vector<Bus*> TransportCatalogue::GetAllBuses() {
-		std::vector<Bus*> out;
+	std::vector<const Bus*> TransportCatalogue::GetAllBuses() const{
+		std::vector<const Bus*> out;
 		out.reserve(buses_.size());
 		bool is_first = true;
-		for (Bus& bus : buses_) {
+		for (const Bus& bus : buses_) {
 			if (is_first) {
 				is_first = false; //пропускаем null_bus
 				continue;
 			}
-			out.push_back(&bus);
+			out.emplace_back(&bus);
+		}
+		return out;
+	}
+
+	std::vector<const Stop*> TransportCatalogue::GetAllStops() const{
+		std::vector<const Stop*> out;
+		out.reserve(stops_.size());
+		bool is_first = true;
+		for (const Stop& stop : stops_) {
+			if (is_first) {
+				is_first = false; //пропускаем null_bus
+				continue;
+			}
+			out.push_back(&stop);
 		}
 		return out;
 	}
 
 	const unordered_map<pair<const Stop*, const Stop*>, size_t, PointerPairHasher>& TransportCatalogue::GetDistances() const {
 		return distances_;
+	}
+
+	void TransportCatalogue::LoadDistances(std::unordered_map<std::pair<const Stop*, const Stop*>, std::size_t, PointerPairHasher>& distances) {
+		distances_ = std::move(distances);
 	}
 }
 

@@ -1,6 +1,7 @@
 #include "json_reader.h"
 #include <sstream>
 #include <algorithm>
+#include <filesystem>
 
 namespace DataReader {
 
@@ -8,11 +9,11 @@ namespace DataReader {
 
 	JsonReader::JsonReader(std::istream& input, Catalogue::TransportCatalogue& catalogue)
 		:input_document_(json::Load(input))
-		{
+	{
 		handler_ = std::make_unique<DataBaseInterface::RequestsHandler>(catalogue);
-			bool correct_root = std::holds_alternative<json::Dict>(input_document_.GetRoot().GetValue());
-			assert(correct_root); //в корневом узле должен быть словарь {base_requests : ... , stat_requests : ...}
-		}
+		bool correct_root = std::holds_alternative<json::Dict>(input_document_.GetRoot().GetValue());
+		assert(correct_root); //в корневом узле должен быть словарь {base_requests : ... , stat_requests : ...}
+	}
 
 	JsonReader::JsonReader(std::istream& input, std::unique_ptr<DataBaseInterface::RequestsHandler>&& handler)
 		:input_document_(json::Load(input)), handler_(std::move(handler))
@@ -93,45 +94,86 @@ namespace DataReader {
 
 		json::Dict root_dict = std::get<json::Dict>(input_document_.GetRoot().GetValue());
 
-if (root_dict.count("base_requests")) {
+		if (root_dict.count("base_requests")) {
 
-	bool correct_base_requests_queue = std::holds_alternative<json::Array>(root_dict.at("base_requests").GetValue());
-	assert(correct_base_requests_queue); //в узле base_requests должен быть вектор запросов
-	json::Array base_requests_queue = std::get<json::Array>(root_dict.at("base_requests").GetValue());
+			bool correct_base_requests_queue = std::holds_alternative<json::Array>(root_dict.at("base_requests").GetValue());
+			assert(correct_base_requests_queue); //в узле base_requests должен быть вектор запросов
+			json::Array base_requests_queue = std::get<json::Array>(root_dict.at("base_requests").GetValue());
 
-	for (const json::Node& node : base_requests_queue) {
+			for (const json::Node& node : base_requests_queue) {
 
-		bool correct_base_request = std::holds_alternative<json::Dict>(node.GetValue());
-		assert(correct_base_request); //запрос должен быть в виде словаря
-		json::Dict base_request = std::get<json::Dict>(node.GetValue());
+				bool correct_base_request = std::holds_alternative<json::Dict>(node.GetValue());
+				assert(correct_base_request); //запрос должен быть в виде словаря
+				json::Dict base_request = std::get<json::Dict>(node.GetValue());
 
-		assert(base_request.count("type")); //запрос должен содержать тип
-		assert(std::holds_alternative<std::string>(base_request.at("type").GetValue())); //тип в виде строки
-		std::string base_request_type = std::get<std::string>(base_request.at("type").GetValue());
+				assert(base_request.count("type")); //запрос должен содержать тип
+				assert(std::holds_alternative<std::string>(base_request.at("type").GetValue())); //тип в виде строки
+				std::string base_request_type = std::get<std::string>(base_request.at("type").GetValue());
 
-		if (base_request_type == "Stop") {
-			auto request_parsed = ReadStopBaseRequest(base_request);
-			handler_->DoStopBaseRequest(std::move(request_parsed.first), std::move(request_parsed.second));
-		} //первая проходка
+				if (base_request_type == "Stop") {
+					auto request_parsed = ReadStopBaseRequest(base_request);
+					handler_->DoStopBaseRequest(std::move(request_parsed.first), std::move(request_parsed.second));
+				} //первая проходка
+			}
+
+			for (const json::Node& node : base_requests_queue) {
+
+				json::Dict base_request = std::get<json::Dict>(node.GetValue());
+				std::string base_request_type = std::get<std::string>(base_request.at("type").GetValue());
+
+				if (base_request_type == "Stop") {
+					auto request_parsed = ReadStopBaseRequest(base_request);
+					handler_->DoStopBaseRequest(std::move(request_parsed.first), std::move(request_parsed.second));
+				}
+			} //вторая проходка
+
+		}
 	}
 
-	for (const json::Node& node : base_requests_queue) {
+	void JsonReader::DoSerialization() {
 
-		json::Dict base_request = std::get<json::Dict>(node.GetValue());
-		std::string base_request_type = std::get<std::string>(base_request.at("type").GetValue());
+		json::Dict root_dict = std::get<json::Dict>(input_document_.GetRoot().GetValue());
 
-		if (base_request_type == "Stop") {
-			auto request_parsed = ReadStopBaseRequest(base_request);
-			handler_->DoStopBaseRequest(std::move(request_parsed.first), std::move(request_parsed.second));
+		if (!root_dict.count("serialization_settings")) {
+			return;
 		}
-	} //вторая проходка
 
-}
+		assert(root_dict.at("serialization_settings").IsDict() && root_dict.at("serialization_settings").AsDict().count("file"));
+		std::filesystem::path file_path = root_dict.at("serialization_settings").AsDict().at("file").AsString();
+
+		const Visual::MapSettings map_settings = ReadMapSettings();
+
+		Modules::Module* router_module = modules_.at(Modules::ModuleType::TransportRouter).get();
+		Router::TransportRouter* router = dynamic_cast<Router::TransportRouter*>(router_module);
+
+		handler_->DoSerialization(file_path, map_settings, *router);
+	}
+
+	void JsonReader::DoDeSerialization() {
+
+		json::Dict root_dict = std::get<json::Dict>(input_document_.GetRoot().GetValue());
+
+		if (!root_dict.count("serialization_settings")) {
+			return;
+		}
+
+		assert(root_dict.at("serialization_settings").IsDict() && root_dict.at("serialization_settings").AsDict().count("file"));
+		std::filesystem::path file_path = root_dict.at("serialization_settings").AsDict().at("file").AsString();
+
+		Visual::MapSettings map_settings;
+		auto empty_router = std::make_unique<Router::TransportRouter>();
+
+		handler_->DoDeSerialization(file_path, map_settings, *empty_router);
+
+		SetNewMap(map_settings);
+		SetNewTransportRouter(std::move(empty_router));
 	}
 
 	void JsonReader::ReadBaseRequests() {
 		ReadStopsBaseRequests();
 		ReadBusesBaseRequests();
+		SetNewTransportRouter();
+		DoSerialization();
 	}
 
 	std::tuple<std::string, std::vector<std::string>, std::string> JsonReader::ReadBusBaseRequest(const json::Dict base_request) {
@@ -198,6 +240,8 @@ if (root_dict.count("base_requests")) {
 	}
 
 	void JsonReader::ReadStatRequests(std::ostream& output) {
+
+		DoDeSerialization();
 
 		json::Dict root_dict = std::get<json::Dict>(input_document_.GetRoot().GetValue());
 
@@ -280,7 +324,7 @@ if (root_dict.count("base_requests")) {
 		Modules::Module* cur_module = modules_.at(Modules::ModuleType::TransportRouter).get();
 		Router::TransportRouter* router = dynamic_cast<Router::TransportRouter*>(cur_module);
 		return router->FindRoute(
-		handler_->GetStop(request_parsed.from), handler_->GetStop(request_parsed.to));
+			handler_->GetStop(request_parsed.from), handler_->GetStop(request_parsed.to));
 	}
 
 	std::string JsonReader::DoMapRequest() {
@@ -315,7 +359,7 @@ if (root_dict.count("base_requests")) {
 
 		json::Document result_node{ json::Builder{}.StartDict().Key("curvature").Value(bus_info.curvature).Key("request_id").Value(id)
 		.Key("route_length").Value(bus_info.length).Key("stop_count").Value(static_cast<int>(bus_info.stops_number)).Key("unique_stop_count").Value(static_cast<int>(bus_info.unique_stops_number)).EndDict()
-		.Build()};
+		.Build() };
 
 		return result_node;
 	}
@@ -323,14 +367,14 @@ if (root_dict.count("base_requests")) {
 	json::Document JsonReader::MakeStopInfoJSON(int id, Catalogue::StopInfo& stop_info) {
 
 		if (stop_info.is_not_found) {
-			json::Document result_node{ json::Builder{}.StartDict().Key("request_id").Value(id).Key("error_message").Value("not found"s).EndDict().Build()};
+			json::Document result_node{ json::Builder{}.StartDict().Key("request_id").Value(id).Key("error_message").Value("not found"s).EndDict().Build() };
 			return result_node;
 		}
 
 		json::Array buses;
 		for (const std::string& bus : stop_info.bus_list) {
 			buses.emplace_back(bus);
-			}
+		}
 
 		json::Document result_node{ json::Builder{}.StartDict().Key("buses").Value(buses).Key("request_id").Value(id).EndDict().Build() };
 
@@ -463,7 +507,7 @@ if (root_dict.count("base_requests")) {
 					.Key("stop_name"s).Value(w_item->stop->name)
 					.Key("time"s).Value(w_item->time)
 					.Key("type"s).Value("Wait"s)
-					.EndDict().Build()};
+					.EndDict().Build() };
 				items.push_back(wait);
 			}
 			else if (item->GetType() == RouteItemType::BusItem) {

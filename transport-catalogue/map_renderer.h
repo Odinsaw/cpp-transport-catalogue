@@ -12,7 +12,7 @@ namespace Visual {
 
     class Map : public svg::Drawable {
     public:
-        Map(MapSettings settings, std::vector<Catalogue::Bus*> buses);
+        Map(MapSettings settings, std::vector<const Catalogue::Bus*> buses);
 
         void Draw(svg::ObjectContainer& container) const override;
 
@@ -25,17 +25,17 @@ namespace Visual {
         const svg::Color& GetBusLineColor(size_t index) const;
 
         struct LexicSorterByName {
-            bool operator()(Catalogue::Stop* lhs, Catalogue::Stop* rhs) const;
+            bool operator()(const Catalogue::Stop* lhs, const Catalogue::Stop* rhs) const;
         };
 
         MapSettings settings_;
-        std::vector<Catalogue::Bus*> buses_;
-        std::map<Catalogue::Stop*, svg::Point, LexicSorterByName> stops_positions_;
+        std::vector<const Catalogue::Bus*> buses_;
+        std::map<const Catalogue::Stop*, svg::Point, LexicSorterByName> stops_positions_;
     };
 
     class MapRenderer : public Modules::Module {
     public:
-        MapRenderer(MapSettings settings, std::vector<Catalogue::Bus*> buses);
+        MapRenderer(MapSettings settings, std::vector<const Catalogue::Bus*> buses);
 
         std::string GetMap();
 

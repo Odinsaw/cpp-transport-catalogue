@@ -70,14 +70,14 @@ namespace Visual {
 
     } // namespace
 
-    Map::Map(MapSettings settings, std::vector<Catalogue::Bus*> buses)
+    Map::Map(MapSettings settings, std::vector<const Catalogue::Bus*> buses)
         : settings_(std::move(settings)), buses_(std::move(buses))
     {
-        std::sort(buses_.begin(), buses_.end(), [](Catalogue::Bus* lhs, Catalogue::Bus* rhs) {
+        std::sort(buses_.begin(), buses_.end(), [](const Catalogue::Bus* lhs, const Catalogue::Bus* rhs) {
             return lhs->name < rhs->name;
             }); //отрисовываем в алфавитном порядке
 
-        std::unordered_set<Catalogue::Stop*> stops;
+        std::unordered_set<const Catalogue::Stop*> stops;
         for (const auto bus : buses_) {
             stops.insert(bus->stops.begin(), bus->stops.end());
         }
@@ -106,7 +106,7 @@ namespace Visual {
         size_t bus_index = 0;
 
         for (const auto bus : buses_) {
-            std::vector<Catalogue::Stop*>& stops = bus->stops;
+            const std::vector<Catalogue::Stop*>& stops = bus->stops;
 
             if (!stops.empty()) {
                 auto line = svg::Polyline()
@@ -198,11 +198,11 @@ namespace Visual {
         return !palette.empty() ? palette[index % palette.size()] : default_color;
     }
 
-    bool Map::LexicSorterByName::operator()(Catalogue::Stop* lhs, Catalogue::Stop* rhs) const {
+    bool Map::LexicSorterByName::operator()(const Catalogue::Stop* lhs, const Catalogue::Stop* rhs) const {
         return lhs->name < rhs->name;
     }
 
-    MapRenderer::MapRenderer(MapSettings settings, std::vector<Catalogue::Bus*> buses)
+    MapRenderer::MapRenderer(MapSettings settings, std::vector<const Catalogue::Bus*> buses)
         :Modules::Module(Modules::ModuleType::MapRenderer)
     {
 

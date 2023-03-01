@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package transport_catalogue;
+
+message Point{
+	double x = 1;
+	double y = 2;
+}
+
+message RGB{
+	uint32 r = 1;
+	uint32 g = 2;
+	uint32 b = 3;
+}
+
+message Color{
+	string string_val = 1;
+	RGB rgb_val = 2;
+	double opacity = 3;
+	bool monostate = 4;
+	bool rgba = 5;
+}
+
+message MapSettings{
+		double width = 1;
+		double height = 2;
+		double padding = 3;
+		double line_width = 4;
+		double stop_radius = 5;
+		uint32 bus_label_font_size = 6;
+		Point bus_label_offset = 7;
+		uint32 stop_label_font_size = 8;
+		Point stop_label_offset = 9;
+		Color underlayer_color = 10;
+		double underlayer_width = 11;
+		string stop_label_font_family = 12;
+		string bus_label_font_family = 13;
+		repeated Color color_palette = 14;
+}
